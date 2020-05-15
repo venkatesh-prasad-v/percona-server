@@ -357,7 +357,7 @@ void Master_info::end_info() {
 
 int Master_info::flush_info(bool force) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("master_pos: %lu", (ulong)master_log_pos));
+  DBUG_PRINT("custom_info", ("master_pos: %lu", (ulong)master_log_pos));
 
   bool skip_flushing = !inited;
   /*

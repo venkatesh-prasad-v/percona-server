@@ -386,9 +386,10 @@ bool Rpl_applier_reader::move_to_next_log() {
 
   /* Reset the relay-log-change-notified status of slave workers */
   if (m_rli->is_parallel_exec()) {
-    DBUG_PRINT("info", ("next_event: MTS group relay log changes to %s %lu\n",
-                        m_rli->get_group_relay_log_name(),
-                        (ulong)m_rli->get_group_relay_log_pos()));
+    DBUG_PRINT("custom_info",
+               ("next_event: MTS group relay log changes to %s %lu\n",
+                m_rli->get_group_relay_log_name(),
+                (ulong)m_rli->get_group_relay_log_pos()));
     m_rli->reset_notified_relay_log_change();
   }
 
@@ -507,10 +508,10 @@ void Rpl_applier_reader::debug_print_next_event_positions() {
        m_rli->get_event_relay_log_pos(), m_rli->get_event_relay_log_name()));
 
   /* This is an assertion which sometimes fails, let's try to track it */
-  DBUG_PRINT("info", ("m_relaylog_file_reader->position() %llu "
-                      "m_rli->event_relay_log_pos=%llu",
-                      m_relaylog_file_reader.position(),
-                      m_rli->get_event_relay_log_pos()));
+  DBUG_PRINT("custom_info", ("m_relaylog_file_reader->position() %llu "
+                             "m_rli->event_relay_log_pos=%llu",
+                             m_relaylog_file_reader.position(),
+                             m_rli->get_event_relay_log_pos()));
 
   DBUG_ASSERT(m_relaylog_file_reader.position() >= BIN_LOG_HEADER_SIZE);
   DBUG_ASSERT(m_relaylog_file_reader.position() ==
@@ -527,9 +528,9 @@ void Rpl_applier_reader::debug_print_next_event_positions() {
        m_rli->get_event_relay_log_name(),
        (ulong)m_rli->get_event_relay_log_pos()));
 
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("m_rli->relay_log.get_binlog_end_pos()= %llu", m_log_end_pos));
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("active_log= %s", m_reading_active_log ? "true" : "false"));
 }
 #endif

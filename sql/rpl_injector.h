@@ -346,7 +346,7 @@ class injector {
                                          "ROW_STATE", "STATE_COUNT"};
 
       DBUG_ASSERT(0 <= target_state && target_state <= STATE_COUNT);
-      DBUG_PRINT("info", ("In state %s", state_name[m_state]));
+      DBUG_PRINT("custom_info", ("In state %s", state_name[m_state]));
 #endif
 
       if (m_state <= target_state && target_state <= m_state + 1 &&

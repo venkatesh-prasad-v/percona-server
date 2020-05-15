@@ -328,6 +328,9 @@ inline bool check_database_filters(THD *thd, const char *db,
         break;
     }
   }
+  if (db_ok)
+    DBUG_PRINT("info", ("checing database filters: Decision: we should filter "
+                        "the statement."));
   return db_ok;
 }
 
@@ -1254,8 +1257,8 @@ bool do_command(THD *thd) {
 #ifndef DBUG_OFF
     char desc[VIO_DESCRIPTION_SIZE];
     vio_description(net->vio, desc);
-    DBUG_PRINT("info", ("Got error %d reading command from socket %s",
-                        net->error, desc));
+    DBUG_PRINT("custom_info", ("Got error %d reading command from socket %s",
+                               net->error, desc));
 #endif  // DBUG_OFF
     /* Instrument this broken statement as "statement/com/error" */
     thd->m_statement_psi = MYSQL_REFINE_STATEMENT(
@@ -1284,12 +1287,13 @@ bool do_command(THD *thd) {
 #ifndef DBUG_OFF
   char desc[VIO_DESCRIPTION_SIZE];
   vio_description(net->vio, desc);
-  DBUG_PRINT("info", ("Command on %s = %d (%s)", desc, command,
-                      command_name[command].str));
+  DBUG_PRINT("custom_info", ("Command on %s = %d (%s)", desc, command,
+                             command_name[command].str));
 #endif  // DBUG_OFF
-  DBUG_PRINT("info", ("packet: '%*.s'; command: %d",
-                      thd->get_protocol_classic()->get_packet_length(),
-                      thd->get_protocol_classic()->get_raw_packet(), command));
+  DBUG_PRINT("custom_info",
+             ("packet: '%*.s'; command: %d",
+              thd->get_protocol_classic()->get_packet_length(),
+              thd->get_protocol_classic()->get_raw_packet(), command));
   if (thd->get_protocol_classic()->bad_packet)
     DBUG_ASSERT(0);  // Should be caught earlier
 
@@ -1505,7 +1509,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   bool error = false;
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
   DBUG_TRACE;
-  DBUG_PRINT("info", ("command: %d", command));
+  DBUG_PRINT("custom_info", ("command: %d", command));
 
   DBUG_EXECUTE_IF("crash_dispatch_command_before", {
     DBUG_PRINT("crash_dispatch_command_before", ("now"));
@@ -1922,7 +1926,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           (thd->get_stmt_da()->is_ok()))
         error = true;
 
-      DBUG_PRINT("info", ("query ready"));
+      DBUG_PRINT("custom_info", ("query ready"));
       break;
     }
     case COM_FIELD_LIST:  // This isn't actually needed
@@ -2732,6 +2736,7 @@ static inline void binlog_gtid_end_transaction(THD *thd) {
       ((thd->lex->sql_command == SQLCOM_CREATE_TABLE ||
         thd->lex->sql_command == SQLCOM_DROP_TABLE) &&
        !thd->in_multi_stmt_transaction_mode()))
+
     (void)mysql_bin_log.gtid_end_transaction(thd);
 }
 
@@ -3002,6 +3007,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
       return -1;
     case GTID_STATEMENT_SKIP:
       my_ok(thd);
+      DBUG_PRINT(
+          "info",
+          ("Skipping trx: gtid_next->type=%d owned_gtid.{sidno,gno}={%d,%lld}",
+           thd->variables.gtid_next.type, thd->owned_gtid.sidno,
+           thd->owned_gtid.gno));
       binlog_gtid_end_transaction(thd);
       return 0;
   }
@@ -3927,7 +3937,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
           default:
             DBUG_ASSERT(0);
         }
-        DBUG_PRINT("info", ("DDL error code=%d", res));
+        DBUG_PRINT("custom_info", ("DDL error code=%d", res));
         if (!res && !thd->killed) my_ok(thd);
 
       } while (false);
@@ -5547,7 +5557,7 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat) {
         thd->m_statement_psi, sql_statement_info[SQLCOM_END].m_key);
 
     DBUG_ASSERT(thd->is_error());
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Command aborted. Fatal_error: %d", thd->is_fatal_error()));
   }
 

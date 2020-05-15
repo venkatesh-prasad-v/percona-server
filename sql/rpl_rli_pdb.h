@@ -788,7 +788,7 @@ class Slave_worker : public Relay_log_info {
             info_thd->in_active_multi_stmt_transaction();
 
         if (!is_in_group() && !in_active_multi_stmt) {
-          DBUG_PRINT("info",
+          DBUG_PRINT("custom_info",
                      ("Setting gtid_next.type to NOT_YET_DETERMINED_GTID"));
           info_thd->variables.gtid_next.set_not_yet_determined();
         } else if (in_active_multi_stmt) {

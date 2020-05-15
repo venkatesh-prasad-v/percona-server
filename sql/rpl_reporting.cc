@@ -96,8 +96,8 @@ int Slave_reporting_capability::has_temporary_error(THD *thd, uint error_arg,
       thd->get_stmt_da()->sql_conditions();
   const Sql_condition *err;
   while ((err = it++)) {
-    DBUG_PRINT("info", ("has condition %d %s", err->mysql_errno(),
-                        err->message_text()));
+    DBUG_PRINT("custom_info", ("has condition %d %s", err->mysql_errno(),
+                               err->message_text()));
     switch (err->mysql_errno()) {
       case ER_GET_TEMPORARY_ERRMSG:
         return 1;

@@ -42,15 +42,14 @@
 #include <string>
 
 #include "lex_string.h"
-#include "m_string.h"  // native_strncasecmp
-#include "my_aes.h"
 #include "libbinlogevents/include/binlog_event.h"
 #include "libbinlogevents/include/control_events.h"
 #include "libbinlogevents/include/load_data_events.h"
 #include "libbinlogevents/include/rows_event.h"
 #include "libbinlogevents/include/statement_events.h"
 #include "libbinlogevents/include/uuid.h"
-#include "m_string.h"   // native_strncasecmp
+#include "m_string.h"  // native_strncasecmp
+#include "my_aes.h"
 #include "my_bitmap.h"  // MY_BITMAP
 #include "my_dbug.h"
 #include "my_inttypes.h"
@@ -1230,10 +1229,11 @@ class Log_event {
   enum_skip_reason shall_skip(Relay_log_info *rli) {
     DBUG_TRACE;
     enum_skip_reason ret = do_shall_skip(rli);
-    DBUG_PRINT("info", ("skip reason=%d=%s", ret,
-                        ret == EVENT_SKIP_NOT
-                            ? "NOT"
-                            : ret == EVENT_SKIP_IGNORE ? "IGNORE" : "COUNT"));
+    DBUG_PRINT("custom_info",
+               ("skip reason=%d=%s", ret,
+                ret == EVENT_SKIP_NOT
+                    ? "NOT"
+                    : ret == EVENT_SKIP_IGNORE ? "IGNORE" : "COUNT"));
     return ret;
   }
 
@@ -3518,7 +3518,7 @@ class Incident_log_event : public binary_log::Incident_event, public Log_event {
         Log_event(thd_arg, LOG_EVENT_NO_FILTER_F, Log_event::EVENT_NO_CACHE,
                   Log_event::EVENT_IMMEDIATE_LOGGING, header(), footer()) {
     DBUG_TRACE;
-    DBUG_PRINT("enter", ("incident: %d", incident_arg));
+    DBUG_PRINT("custom_info", ("incident: %d", incident_arg));
     common_header->set_is_valid(incident_arg > INCIDENT_NONE &&
                                 incident_arg < INCIDENT_COUNT);
     DBUG_ASSERT(message == nullptr && message_length == 0);
@@ -3531,7 +3531,7 @@ class Incident_log_event : public binary_log::Incident_event, public Log_event {
         Log_event(thd_arg, LOG_EVENT_NO_FILTER_F, Log_event::EVENT_NO_CACHE,
                   Log_event::EVENT_IMMEDIATE_LOGGING, header(), footer()) {
     DBUG_TRACE;
-    DBUG_PRINT("enter", ("incident: %d", incident_arg));
+    DBUG_PRINT("custom_info", ("incident: %d", incident_arg));
     common_header->set_is_valid(incident_arg > INCIDENT_NONE &&
                                 incident_arg < INCIDENT_COUNT);
     DBUG_ASSERT(message == nullptr && message_length == 0);
@@ -3679,7 +3679,7 @@ class Rows_query_log_event : public Ignorable_log_event,
                                 query_len + 1, MYF(MY_WME))))
       return;
     snprintf(m_rows_query, query_len + 1, "%s", query);
-    DBUG_PRINT("enter", ("%s", m_rows_query));
+    DBUG_PRINT("custom_info", ("%s", m_rows_query));
     return;
   }
 #endif
@@ -4025,7 +4025,7 @@ class Previous_gtids_log_event : public binary_log::Previous_gtids_event,
           files only.
         */
         !is_relay_log_event()) {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("skip writing Previous_gtids_log_event because of"
                   "debug option 'skip_writing_previous_gtids_log_event'"));
       return false;
@@ -4037,7 +4037,7 @@ class Previous_gtids_log_event : public binary_log::Previous_gtids_event,
           for writing a partial previous_gtids_log_event on binlog files only.
         */
         !is_relay_log_event()) {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("writing partial Previous_gtids_log_event because of"
                   "debug option 'write_partial_previous_gtids_log_event'"));
       return (Log_event::write_header(ostream, get_data_size()) ||

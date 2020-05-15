@@ -35,15 +35,15 @@ class Commit_order_manager;
 
 bool Commit_stage_manager::Mutex_queue::append(THD *first) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("first: 0x%llx", (ulonglong)first));
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info", ("first: 0x%llx", (ulonglong)first));
+  DBUG_PRINT("custom_info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   int32 count = 1;
   bool empty = (m_first == nullptr);
 
   *m_last = first;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   /*
@@ -59,11 +59,11 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
   m_size += count;
 
   m_last = &first->next_to_commit;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   DBUG_ASSERT(m_first || m_last == &m_first);
-  DBUG_PRINT("return", ("empty: %s", YESNO(empty)));
+  DBUG_PRINT("custom_info", ("empty: %s", YESNO(empty)));
   return empty;
 }
 
@@ -87,7 +87,7 @@ std::pair<bool, THD *> Commit_stage_manager::Mutex_queue::pop_front() {
   --m_size;
   DBUG_ASSERT(m_first || m_last == &m_first);
   unlock();
-  DBUG_PRINT("return",
+  DBUG_PRINT("custom_info",
              ("result: 0x%llx, more: %s", (ulonglong)result, YESNO(more)));
   return std::make_pair(more, result);
 }
@@ -148,7 +148,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
   DBUG_TRACE;
 
   // If the queue was empty: we're the leader for this batch
-  DBUG_PRINT("debug",
+  DBUG_PRINT("custom_info",
              ("Enqueue 0x%llx to queue for stage %d", (ulonglong)thd, stage));
 
   lock_queue(stage);
@@ -223,7 +223,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
   if (stage_mutex && need_unlock_stage_mutex) mysql_mutex_unlock(stage_mutex);
 
 #ifndef DBUG_OFF
-  DBUG_PRINT("info", ("This is a leader thread: %d (0=n 1=y)", leader));
+  DBUG_PRINT("custom_info", ("This is a leader thread: %d (0=n 1=y)", leader));
 
   DEBUG_SYNC(thd, "after_enrolling_for_stage");
 
@@ -341,17 +341,18 @@ THD *Commit_stage_manager::Mutex_queue::fetch_and_empty_skip_acquire_lock() {
 
 THD *Commit_stage_manager::Mutex_queue::fetch_and_empty() {
   DBUG_TRACE;
-  DBUG_PRINT("enter",
+  DBUG_PRINT("custom_info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   THD *result = m_first;
   m_first = nullptr;
   m_last = &m_first;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
-  DBUG_PRINT("info", ("fetched queue of %d transactions", m_size.load()));
-  DBUG_PRINT("return", ("result: 0x%llx", (ulonglong)result));
+  DBUG_PRINT("custom_info",
+             ("fetched queue of %d transactions", m_size.load()));
+  DBUG_PRINT("custom_info", ("result: 0x%llx", (ulonglong)result));
   DBUG_ASSERT(m_size.load() >= 0);
   m_size.store(0);
   return result;
@@ -381,12 +382,12 @@ void Commit_stage_manager::wait_count_or_timeout(ulong count, long usec,
 }
 
 THD *Commit_stage_manager::fetch_queue_acquire_lock(StageID stage) {
-  DBUG_PRINT("debug", ("Fetching queue for stage %d", stage));
+  DBUG_PRINT("custom_info", ("Fetching queue for stage %d", stage));
   return m_queue[stage].fetch_and_empty_acquire_lock();
 }
 
 THD *Commit_stage_manager::fetch_queue_skip_acquire_lock(StageID stage) {
-  DBUG_PRINT("debug", ("Fetching queue for stage %d", stage));
+  DBUG_PRINT("custom_info", ("Fetching queue for stage %d", stage));
   return m_queue[stage].fetch_and_empty_skip_acquire_lock();
 }
 

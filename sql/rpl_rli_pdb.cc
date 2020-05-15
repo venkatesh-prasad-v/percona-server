@@ -501,16 +501,17 @@ bool Slave_worker::read_info(Rpl_info_handler *from) {
   if (from->prepare_info_for_read()) return true;
 
   if (!!from->get_info(&temp_internal_id, 0) ||
-      !!from->get_info(group_relay_log_name, sizeof(group_relay_log_name), "") ||
+      !!from->get_info(group_relay_log_name, sizeof(group_relay_log_name),
+                       "") ||
       !!from->get_info(&temp_group_relay_log_pos, 0UL) ||
       !!from->get_info(temp_group_master_log_name,
-                     sizeof(temp_group_master_log_name), "") ||
+                       sizeof(temp_group_master_log_name), "") ||
       !!from->get_info(&temp_group_master_log_pos, 0UL) ||
       !!from->get_info(checkpoint_relay_log_name,
-                     sizeof(checkpoint_relay_log_name), "") ||
+                       sizeof(checkpoint_relay_log_name), "") ||
       !!from->get_info(&temp_checkpoint_relay_log_pos, 0UL) ||
       !!from->get_info(checkpoint_master_log_name,
-                     sizeof(checkpoint_master_log_name), "") ||
+                       sizeof(checkpoint_master_log_name), "") ||
       !!from->get_info(&temp_checkpoint_master_log_pos, 0UL) ||
       !!from->get_info(&temp_checkpoint_seqno, 0UL) ||
       !!from->get_info(&nbytes, 0UL) ||
@@ -680,10 +681,11 @@ bool Slave_worker::commit_positions(Log_event *ev, Slave_job_group *ptr_g,
   */
   set_group_master_log_name(c_rli->get_group_master_log_name());
 
-  DBUG_PRINT("mts", ("Committing worker-id %lu group master log pos %llu "
-                     "group master log name %s checkpoint sequence number %lu.",
-                     id, get_group_master_log_pos(),
-                     get_group_master_log_name(), worker_checkpoint_seqno));
+  DBUG_PRINT("custom_info",
+             ("Committing worker-id %lu group master log pos %llu "
+              "group master log name %s checkpoint sequence number %lu.",
+              id, get_group_master_log_pos(), get_group_master_log_name(),
+              worker_checkpoint_seqno));
 
   DBUG_EXECUTE_IF("mts_debug_concurrent_access",
                   { mts_debug_concurrent_access++; };);
@@ -703,7 +705,8 @@ static void free_entry(db_worker_hash_entry *entry) {
 
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("free_entry %s, %zu", entry->db, strlen(entry->db)));
+  DBUG_PRINT("custom_info",
+             ("free_entry %s, %zu", entry->db, strlen(entry->db)));
 
   DBUG_ASSERT(c_thd->system_thread == SYSTEM_THREAD_SLAVE_SQL);
 
@@ -915,7 +918,7 @@ Slave_worker *map_db_to_worker(const char *dbname, Relay_log_info *rli,
     }
   }
 
-  DBUG_PRINT("info", ("Searching for %s, %zu", dbname, dblength));
+  DBUG_PRINT("custom_info", ("Searching for %s, %zu", dbname, dblength));
 
   mysql_mutex_lock(&rli->slave_worker_hash_lock);
 
@@ -933,7 +936,7 @@ Slave_worker *map_db_to_worker(const char *dbname, Relay_log_info *rli,
 
     mysql_mutex_unlock(&rli->slave_worker_hash_lock);
 
-    DBUG_PRINT("info", ("Inserting %s, %zu", dbname, dblength));
+    DBUG_PRINT("custom_info", ("Inserting %s, %zu", dbname, dblength));
     /*
       Allocate an entry to be inserted and if the operation fails
       an error is returned.
@@ -993,7 +996,8 @@ Slave_worker *map_db_to_worker(const char *dbname, Relay_log_info *rli,
       entry = nullptr;
       goto err;
     }
-    DBUG_PRINT("info", ("Inserted %s, %zu", entry->db, strlen(entry->db)));
+    DBUG_PRINT("custom_info",
+               ("Inserted %s, %zu", entry->db, strlen(entry->db)));
   } else {
     /* There is a record. Either  */
     if (entry->usage == 0) {
@@ -1066,7 +1070,7 @@ Slave_worker *map_db_to_worker(const char *dbname, Relay_log_info *rli,
 
 err:
   if (entry) {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Updating %s with worker %lu", entry->db, entry->worker->id));
     rli->curr_group_assigned_parts.push_back(entry);
     *ptr_entry = entry;
@@ -1184,8 +1188,8 @@ void Slave_worker::slave_worker_ends_group(Log_event *ev, int error) {
 
         if (entry->worker != this)  // Coordinator is waiting
         {
-          DBUG_PRINT("info", ("Notifying entry %p release by worker %lu", entry,
-                              this->id));
+          DBUG_PRINT("custom_info", ("Notifying entry %p release by worker %lu",
+                                     entry, this->id));
 
           mysql_cond_signal(&c_rli->slave_worker_hash_cond);
         }
@@ -1319,7 +1323,7 @@ bool Slave_committed_queue::count_done(Relay_log_info *rli) {
 
   DBUG_ASSERT(cnt <= size);
 
-  DBUG_PRINT("mts",
+  DBUG_PRINT("custom_info",
              ("Checking if it can simulate a crash:"
               " mts_checkpoint_group %u counter %lu parallel slaves %lu\n",
               opt_mts_checkpoint_group, cnt, rli->slave_parallel_workers));
@@ -1947,7 +1951,7 @@ bool Slave_worker::read_and_apply_events(uint start_relay_number,
     Log_event *ev = nullptr;
 
     if (!relaylog_file_reader.is_open()) {
-      DBUG_PRINT("info", ("Open relay log %s", file_name));
+      DBUG_PRINT("custom_info", ("Open relay log %s", file_name));
 
       if (relaylog_file_reader.open(file_name, start_relay_pos)) {
         LogErr(ERROR_LEVEL, ER_RPL_FAILED_TO_OPEN_RELAY_LOG, file_name,
@@ -2394,10 +2398,10 @@ void report_error_to_coordinator(Slave_worker *worker) {
   */
   if (thd->is_error()) {
     char const *const errmsg = thd->get_stmt_da()->message_text();
-    DBUG_PRINT("info", ("thd->get_stmt_da()->get_mysql_errno()=%d; "
-                        "worker->last_error.number=%d",
-                        thd->get_stmt_da()->mysql_errno(),
-                        worker->last_error().number));
+    DBUG_PRINT("custom_info", ("thd->get_stmt_da()->get_mysql_errno()=%d; "
+                               "worker->last_error.number=%d",
+                               thd->get_stmt_da()->mysql_errno(),
+                               worker->last_error().number));
 
     if (worker->last_error().number == 0 &&
         /*
@@ -2474,8 +2478,8 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
 
     ev = job_item->data;
     DBUG_ASSERT(ev != nullptr);
-    DBUG_PRINT("info", ("W_%lu <- job item: %p data: %p thd: %p", worker->id,
-                        job_item, ev, thd));
+    DBUG_PRINT("custom_info", ("W_%lu <- job item: %p data: %p thd: %p",
+                               worker->id, job_item, ev, thd));
     /*
       Associate the freshly read event with worker.
       The binding also remains when the loop breaks at the group end event
@@ -2537,8 +2541,8 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
     job_item = pop_jobs_item(worker, job_item);
   }
 
-  DBUG_PRINT("info", (" commits GAQ index %lu, last committed  %lu",
-                      ev->mts_group_idx, worker->last_group_done_index));
+  DBUG_PRINT("custom_info", (" commits GAQ index %lu, last committed  %lu",
+                             ev->mts_group_idx, worker->last_group_done_index));
   /* The group is applied successfully, so error should be 0 */
   worker->slave_worker_ends_group(ev, 0);
 
@@ -2575,14 +2579,15 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
   }
 
 #ifndef DBUG_OFF
-  DBUG_PRINT("mts", ("Check_slave_debug_group worker %lu mts_checkpoint_group"
-                     " %u processed %lu debug %d\n",
-                     worker->id, opt_mts_checkpoint_group, worker->groups_done,
-                     DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0)));
+  DBUG_PRINT("custom_info",
+             ("Check_slave_debug_group worker %lu mts_checkpoint_group"
+              " %u processed %lu debug %d\n",
+              worker->id, opt_mts_checkpoint_group, worker->groups_done,
+              DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0)));
 
   if (DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0) &&
       opt_mts_checkpoint_group == worker->groups_done) {
-    DBUG_PRINT("mts", ("Putting worker %lu in busy wait.", worker->id));
+    DBUG_PRINT("custom_info", ("Putting worker %lu in busy wait.", worker->id));
     while (true) my_sleep(6000000);
   }
 #endif
@@ -2594,10 +2599,10 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
 err:
   if (error) {
     report_error_to_coordinator(worker);
-    DBUG_PRINT("info", ("Worker %lu is exiting: killed %i, error %i, "
-                        "running_status %d",
-                        worker->id, thd->killed.load(), thd->is_error(),
-                        worker->running_status));
+    DBUG_PRINT("custom_info", ("Worker %lu is exiting: killed %i, error %i, "
+                               "running_status %d",
+                               worker->id, thd->killed.load(), thd->is_error(),
+                               worker->running_status));
     worker->slave_worker_ends_group(ev, error); /* last done sets post exec */
   }
   return error;

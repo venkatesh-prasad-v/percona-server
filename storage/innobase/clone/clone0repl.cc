@@ -41,6 +41,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 THD *thd_get_current_thd();
 
 void Clone_persist_gtid::add(const Gtid_desc &gtid_desc) {
+  DBUG_TRACE;
   /* Check if valid descriptor. */
   if (!gtid_desc.m_is_set) {
     return;
@@ -65,6 +66,7 @@ void Clone_persist_gtid::add(const Gtid_desc &gtid_desc) {
 }
 
 bool Clone_persist_gtid::persists_gtid(const trx_t *trx) {
+  DBUG_TRACE;
   auto thd = trx->mysql_thd;
   if (thd == nullptr) {
     thd = thd_get_current_thd();
@@ -73,6 +75,7 @@ bool Clone_persist_gtid::persists_gtid(const trx_t *trx) {
 }
 
 void Clone_persist_gtid::set_persist_gtid(trx_t *trx, bool set) {
+  DBUG_TRACE;
   bool thd_check = false;
   auto thd = trx->mysql_thd;
 
@@ -90,6 +93,8 @@ void Clone_persist_gtid::set_persist_gtid(trx_t *trx, bool set) {
     thd->reset_gtid_persisted_by_se();
     /* Reset transaction flag also. */
     trx->persists_gtid = false;
+    DBUG_PRINT("custom_info",
+               ("Reset the GTID persists flag by Innodb for the current thd."));
     return;
   }
 
@@ -132,10 +137,13 @@ void Clone_persist_gtid::set_persist_gtid(trx_t *trx, bool set) {
   /* Set or Reset GTID persist flag in THD session. The transaction flag
   is set later during prepare/commit/rollback. */
   thd->set_gtid_persisted_by_se();
+  DBUG_PRINT("custom_info",
+             ("Set the GTID persists flag for the current thd."));
 }
 
 bool Clone_persist_gtid::trx_check_set(trx_t *trx, bool prepare,
                                        bool rollback) {
+  DBUG_TRACE;
   auto thd = trx->mysql_thd;
   bool alloc_check = false;
 
@@ -275,6 +283,7 @@ bool Clone_persist_gtid::has_gtid(trx_t *trx, THD *&thd, bool &passed_check) {
 }
 
 void Clone_persist_gtid::get_gtid_info(trx_t *trx, Gtid_desc &gtid_desc) {
+  DBUG_TRACE;
   gtid_desc.m_is_set = false;
   /* Check if transaction has GTID */
   if (!trx->persists_gtid) {
@@ -302,9 +311,11 @@ void Clone_persist_gtid::get_gtid_info(trx_t *trx, Gtid_desc &gtid_desc) {
   ut_a((size_t)len <= GTID_INFO_SIZE);
 
   gtid_desc.m_is_set = true;
+  DBUG_PRINT("custom_info", ("Gtid Info: %s", char_buf));
 }
 
 int Clone_persist_gtid::write_other_gtids() {
+  DBUG_TRACE;
   int err = 0;
   if (opt_bin_log) {
     err = gtid_state->save_gtids_of_last_binlog_into_table();
@@ -343,6 +354,7 @@ bool Clone_persist_gtid::debug_skip_write(bool compression) {
 int Clone_persist_gtid::write_to_table(uint64_t flush_list_number,
                                        Gtid_set &table_gtid_set,
                                        Sid_map &sid_map) {
+  DBUG_TRACE;
   int err = 0;
   Gtid_set write_gtid_set(&sid_map, nullptr);
 
@@ -383,6 +395,7 @@ int Clone_persist_gtid::write_to_table(uint64_t flush_list_number,
   /* Write GTIDs to table. */
   if (!write_gtid_set.is_empty()) {
     ++m_compression_counter;
+    DBUG_PRINT("custom_info", ("Gtid persist thread - Calling GTP->save()"));
     err = gtid_table_persistor->save(&write_gtid_set, false);
   }
 
@@ -411,6 +424,7 @@ void Clone_persist_gtid::update_gtid_trx_no(trx_id_t new_gtid_trx_no) {
 }
 
 void Clone_persist_gtid::flush_gtids(THD *thd) {
+  DBUG_TRACE;
   int err = 0;
   Sid_map sid_map(nullptr);
   Gtid_set table_gtid_set(&sid_map, nullptr);
@@ -435,6 +449,7 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     auto flush_list_number = switch_active_list();
     /* Exit trx mutex during write to table. */
     trx_sys_mutex_exit();
+    DBUG_PRINT("custom_info", ("Gtid persist thread - Updating the gtid_executed table."));
     err = write_to_table(flush_list_number, table_gtid_set, sid_map);
     m_flush_in_progress.store(false);
     /* Compress always after recovery, if GTIDs are added. */
@@ -612,19 +627,23 @@ bool Clone_persist_gtid::start() {
     return (false);
   }
   m_active.store(true);
+  DBUG_PRINT("custom_info", ("Gtid persist thread - Started persisting"));
   return (true);
 }
 
 void Clone_persist_gtid::stop() {
+  DBUG_TRACE;
   m_close_thread.store(true);
   if (m_thread_active.load() &&
       !wait_thread(false, false, 0, false, false, nullptr)) {
     ib::error(ER_IB_CLONE_TIMEOUT) << "Wait for GTID thread to stop timed out";
     ut_ad(false);
   }
+  DBUG_PRINT("custom_info", ("Gtid persist thread - Stopped persisting"));
 }
 
 void Clone_persist_gtid::flush_if_implicit_gtid(THD *thd) {
+  DBUG_TRACE;
   /* Avoid recursive wait, when we are writing GTID. */
   if (thd == nullptr || m_thread_id == thd_get_thread_id(thd)) {
     return;

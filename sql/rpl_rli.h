@@ -955,10 +955,11 @@ class Relay_log_info : public Rpl_info {
       if (ptr->table == table_arg) {
         *tabledef_var = &static_cast<RPL_TABLE_LIST *>(ptr)->m_tabledef;
         *conv_table_var = static_cast<RPL_TABLE_LIST *>(ptr)->m_conv_table;
-        DBUG_PRINT("debug", ("Fetching table data for table %s.%s:"
-                             " tabledef: %p, conv_table: %p",
-                             table_arg->s->db.str, table_arg->s->table_name.str,
-                             *tabledef_var, *conv_table_var));
+        DBUG_PRINT("custom_info",
+                   ("Fetching table data for table %s.%s:"
+                    " tabledef: %p, conv_table: %p",
+                    table_arg->s->db.str, table_arg->s->table_name.str,
+                    *tabledef_var, *conv_table_var));
         return true;
       }
     return false;
@@ -1354,7 +1355,7 @@ class Relay_log_info : public Rpl_info {
    */
   bool is_in_stmt() const {
     bool ret = (m_flags & (1UL << IN_STMT));
-    DBUG_PRINT("info", ("is_in_stmt()=%d", ret));
+    DBUG_PRINT("custom_info", ("is_in_stmt()=%d", ret));
     return ret;
   }
   /**
@@ -1368,7 +1369,7 @@ class Relay_log_info : public Rpl_info {
   */
   bool is_in_trx_or_stmt() const {
     bool ret = is_in_stmt() || (info_thd->variables.option_bits & OPTION_BEGIN);
-    DBUG_PRINT("info", ("is_in_trx_or_stmt()=%d", ret));
+    DBUG_PRINT("custom_info", ("is_in_trx_or_stmt()=%d", ret));
     return ret;
   }
 
@@ -1399,7 +1400,7 @@ class Relay_log_info : public Rpl_info {
   */
   bool is_in_group() const {
     bool ret = is_in_trx_or_stmt() || info_thd->owned_gtid.sidno != 0;
-    DBUG_PRINT("info", ("is_in_group()=%d", ret));
+    DBUG_PRINT("custom_info", ("is_in_group()=%d", ret));
     return ret;
   }
 

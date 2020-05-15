@@ -381,10 +381,10 @@ void Relay_log_info::reset_notified_checkpoint(ulong shift, time_t new_ts,
     */
     if (shift == 0) w->master_log_change_notified = false;
 
-    DBUG_PRINT("mts", ("reset_notified_checkpoint shift --> %lu, "
-                       "worker->bitmap_shifted --> %lu, worker --> %u.",
-                       shift, w->bitmap_shifted,
-                       static_cast<unsigned>(it - workers.begin())));
+    DBUG_PRINT("custom_info", ("reset_notified_checkpoint shift --> %lu, "
+                               "worker->bitmap_shifted --> %lu, worker --> %u.",
+                               shift, w->bitmap_shifted,
+                               static_cast<unsigned>(it - workers.begin())));
   }
   /*
     There should not be a call where (shift == 0 && rli_checkpoint_seqno != 0).
@@ -394,9 +394,9 @@ void Relay_log_info::reset_notified_checkpoint(ulong shift, time_t new_ts,
   DBUG_ASSERT(current_mts_submode->get_type() != MTS_PARALLEL_TYPE_DB_NAME ||
               !(shift == 0 && rli_checkpoint_seqno != 0));
   rli_checkpoint_seqno = rli_checkpoint_seqno - shift;
-  DBUG_PRINT("mts", ("reset_notified_checkpoint shift --> %lu, "
-                     "rli_checkpoint_seqno --> %u.",
-                     shift, rli_checkpoint_seqno));
+  DBUG_PRINT("custom_info", ("reset_notified_checkpoint shift --> %lu, "
+                             "rli_checkpoint_seqno --> %u.",
+                             shift, rli_checkpoint_seqno));
 
   if (update_timestamp) {
     mysql_mutex_lock(&data_lock);
@@ -498,7 +498,8 @@ static inline int add_relay_log(Relay_log_info *rli, LOG_INFO *linfo) {
   rli->log_space_total += s.st_size;
 #ifndef DBUG_OFF
   char buf[22];
-  DBUG_PRINT("info", ("log_space_total: %s", llstr(rli->log_space_total, buf)));
+  DBUG_PRINT("custom_info",
+             ("log_space_total: %s", llstr(rli->log_space_total, buf)));
 #endif
   return 0;
 }
@@ -615,8 +616,9 @@ int Relay_log_info::wait_for_pos(THD *thd, String *log_name, longlong log_pos,
 
   if (!inited) return -2;
 
-  DBUG_PRINT("enter", ("log_name: '%s'  log_pos: %lu  timeout: %lu",
-                       log_name->c_ptr_safe(), (ulong)log_pos, (ulong)timeout));
+  DBUG_PRINT("custom_info",
+             ("log_name: '%s'  log_pos: %lu  timeout: %lu",
+              log_name->c_ptr_safe(), (ulong)log_pos, (ulong)timeout));
 
   DEBUG_SYNC(thd, "begin_master_pos_wait");
 
@@ -678,10 +680,11 @@ int Relay_log_info::wait_for_pos(THD *thd, String *log_name, longlong log_pos,
     bool pos_reached;
     int cmp_result = 0;
 
-    DBUG_PRINT("info", ("init_abort_pos_wait: %ld  abort_pos_wait: %ld",
-                        init_abort_pos_wait, abort_pos_wait));
-    DBUG_PRINT("info", ("group_master_log_name: '%s'  pos: %lu",
-                        group_master_log_name, (ulong)group_master_log_pos));
+    DBUG_PRINT("custom_info", ("init_abort_pos_wait: %ld  abort_pos_wait: %ld",
+                               init_abort_pos_wait, abort_pos_wait));
+    DBUG_PRINT("custom_info",
+               ("group_master_log_name: '%s'  pos: %lu", group_master_log_name,
+                (ulong)group_master_log_pos));
 
     /*
       group_master_log_name can be "", if we are just after a fresh
@@ -730,7 +733,7 @@ int Relay_log_info::wait_for_pos(THD *thd, String *log_name, longlong log_pos,
 
     // wait for master update, with optional timeout.
 
-    DBUG_PRINT("info", ("Waiting for master update"));
+    DBUG_PRINT("custom_info", ("Waiting for master update"));
     /*
       We are going to mysql_cond_(timed)wait(); if the SQL thread stops it
       will wake us up.
@@ -752,7 +755,7 @@ int Relay_log_info::wait_for_pos(THD *thd, String *log_name, longlong log_pos,
     } else
       mysql_cond_wait(&data_cond, &data_lock);
     thd_wait_end(thd);
-    DBUG_PRINT("info", ("Got signal of master update or timed out"));
+    DBUG_PRINT("custom_info", ("Got signal of master update or timed out"));
     if (is_timeout(error)) {
 #ifndef DBUG_OFF
       /*
@@ -766,13 +769,13 @@ int Relay_log_info::wait_for_pos(THD *thd, String *log_name, longlong log_pos,
     }
     error = 0;
     event_count++;
-    DBUG_PRINT("info", ("Testing if killed or SQL thread not running"));
+    DBUG_PRINT("custom_info", ("Testing if killed or SQL thread not running"));
   }
 
 err:
   mysql_mutex_unlock(&data_lock);
   thd->EXIT_COND(&old_stage);
-  DBUG_PRINT("exit",
+  DBUG_PRINT("custom_info",
              ("killed: %d  abort: %d  slave_running: %d "
               "improper_arguments: %d  timed_out: %d",
               thd->killed.load(), (int)(init_abort_pos_wait != abort_pos_wait),
@@ -787,7 +790,7 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const char *gtid,
                                       double timeout, bool update_THD_status) {
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("Waiting for %s timeout %lf", gtid, timeout));
+  DBUG_PRINT("custom_info", ("Waiting for %s timeout %lf", gtid, timeout));
 
   Gtid_set wait_gtid_set(global_sid_map);
   global_sid_lock->rdlock();
@@ -795,7 +798,7 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const char *gtid,
   global_sid_lock->unlock();
 
   if (ret != RETURN_STATUS_OK) {
-    DBUG_PRINT("exit", ("improper gtid argument"));
+    DBUG_PRINT("custom_info", ("improper gtid argument"));
     return -2;
   }
 
@@ -853,8 +856,8 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const Gtid_set *wait_gtid_set,
   /* The "compare and wait" main loop */
   while (!thd->killed && init_abort_pos_wait == abort_pos_wait &&
          slave_running) {
-    DBUG_PRINT("info", ("init_abort_pos_wait: %ld  abort_pos_wait: %ld",
-                        init_abort_pos_wait, abort_pos_wait));
+    DBUG_PRINT("custom_info", ("init_abort_pos_wait: %ld  abort_pos_wait: %ld",
+                               init_abort_pos_wait, abort_pos_wait));
 
     // wait for master update, with optional timeout.
 
@@ -868,7 +871,7 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const Gtid_set *wait_gtid_set,
 #ifndef DBUG_OFF
     char *wait_gtid_set_buf;
     wait_gtid_set->to_string(&wait_gtid_set_buf);
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Waiting for '%s'. is_subset: %d and "
                 "!is_intersection_nonempty: %d",
                 wait_gtid_set_buf, wait_gtid_set->is_subset(executed_gtids),
@@ -889,7 +892,7 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const Gtid_set *wait_gtid_set,
     }
     global_sid_lock->unlock();
 
-    DBUG_PRINT("info", ("Waiting for master update"));
+    DBUG_PRINT("custom_info", ("Waiting for master update"));
 
     /*
       We are going to mysql_cond_(timed)wait(); if the SQL thread stops it
@@ -912,7 +915,7 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const Gtid_set *wait_gtid_set,
     } else
       mysql_cond_wait(&data_cond, &data_lock);
     thd_wait_end(thd);
-    DBUG_PRINT("info", ("Got signal of master update or timed out"));
+    DBUG_PRINT("custom_info", ("Got signal of master update or timed out"));
     if (is_timeout(error)) {
 #ifndef DBUG_OFF
       /*
@@ -926,13 +929,13 @@ int Relay_log_info::wait_for_gtid_set(THD *thd, const Gtid_set *wait_gtid_set,
     }
     error = 0;
     event_count++;
-    DBUG_PRINT("info", ("Testing if killed or SQL thread not running"));
+    DBUG_PRINT("custom_info", ("Testing if killed or SQL thread not running"));
   }
 
   mysql_mutex_unlock(&data_lock);
 
   if (update_THD_status) thd->EXIT_COND(&old_stage);
-  DBUG_PRINT("exit",
+  DBUG_PRINT("custom_info",
              ("killed: %d  abort: %d  slave_running: %d "
               "improper_arguments: %d  timed_out: %d",
               thd->killed.load(), (int)(init_abort_pos_wait != abort_pos_wait),
@@ -978,8 +981,8 @@ int Relay_log_info::inc_group_relay_log_pos(ulonglong log_pos,
     the relay log is not "val".
     With the end_log_pos solution, we avoid computations involving lengthes.
   */
-  DBUG_PRINT("info", ("log_pos: %lu  group_master_log_pos: %lu", (long)log_pos,
-                      (long)group_master_log_pos));
+  DBUG_PRINT("custom_info", ("log_pos: %lu  group_master_log_pos: %lu",
+                             (long)log_pos, (long)group_master_log_pos));
 
   if (log_pos > 0)  // 3.23 binlogs don't have log_posx
     group_master_log_pos = log_pos;
@@ -1026,7 +1029,7 @@ void Relay_log_info::close_temporary_tables() {
       Don't ask for disk deletion. For now, anyway they will be deleted when
       slave restarts, but it is a better intention to not delete them.
     */
-    DBUG_PRINT("info", ("table: %p", table));
+    DBUG_PRINT("custom_info", ("table: %p", table));
     close_temporary(nullptr, table, true, false);
     num_closed_temp_tables++;
   }
@@ -1098,7 +1101,7 @@ int Relay_log_info::purge_relay_logs(THD *thd, const char **errmsg,
   is_group_master_log_pos_invalid = false;
 
   if (!inited) {
-    DBUG_PRINT("info", ("inited == 0"));
+    DBUG_PRINT("custom_info", ("inited == 0"));
     if (error_on_rli_init_info ||
         /*
           mi->reset means that the channel was reset but still exists. Channel
@@ -1189,7 +1192,8 @@ err:
 #ifndef DBUG_OFF
   char buf[22];
 #endif
-  DBUG_PRINT("info", ("log_space_total: %s", llstr(log_space_total, buf)));
+  DBUG_PRINT("custom_info",
+             ("log_space_total: %s", llstr(log_space_total, buf)));
   mysql_mutex_unlock(&data_lock);
   return error;
 }
@@ -2100,7 +2104,7 @@ bool Relay_log_info::read_info(Rpl_info_handler *from) {
     if (status == Rpl_info_handler::enum_field_get_status::FIELD_VALUE_IS_NULL)
       group_relay_log_name[0] = '\0';
   } else
-    DBUG_PRINT("info", ("relay_log_info file is in old format."));
+    DBUG_PRINT("custom_info", ("relay_log_info file is in old format."));
 
   status =
       from->get_info(&temp_group_relay_log_pos, (ulong)BIN_LOG_HEADER_SIZE);
@@ -2298,7 +2302,7 @@ int Relay_log_info::set_rli_description_event(
             info_thd->in_active_multi_stmt_transaction();
 
         if (!is_in_group() && !in_active_multi_stmt) {
-          DBUG_PRINT("info",
+          DBUG_PRINT("custom_info",
                      ("Setting gtid_next.type to NOT_YET_DETERMINED_GTID"));
           info_thd->variables.gtid_next.set_not_yet_determined();
         } else if (in_active_multi_stmt) {

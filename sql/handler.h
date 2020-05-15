@@ -3255,7 +3255,7 @@ class Alter_inplace_info {
     KEY_PAIR *key_pair = index_rename_buffer + index_rename_count++;
     key_pair->old_key = old_key;
     key_pair->new_key = new_key;
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("index renamed: '%s' to '%s'", old_key->name, new_key->name));
   }
 
@@ -3264,8 +3264,8 @@ class Alter_inplace_info {
         index_altered_visibility_buffer + index_altered_visibility_count++;
     key_pair->old_key = old_key;
     key_pair->new_key = new_key;
-    DBUG_PRINT("info", ("index had visibility altered: %i to %i",
-                        old_key->is_visible, new_key->is_visible));
+    DBUG_PRINT("custom_info", ("index had visibility altered: %i to %i",
+                               old_key->is_visible, new_key->is_visible));
   }
 
   /**
@@ -3275,19 +3275,19 @@ class Alter_inplace_info {
   void add_modified_key(KEY *old_key, KEY *new_key) {
     index_drop_buffer[index_drop_count++] = old_key;
     index_add_buffer[index_add_count++] = (uint)(new_key - key_info_buffer);
-    DBUG_PRINT("info", ("index changed: '%s'", old_key->name));
+    DBUG_PRINT("custom_info", ("index changed: '%s'", old_key->name));
   }
 
   /** Drop key to array of indexes to be dropped. */
   void add_dropped_key(KEY *old_key) {
     index_drop_buffer[index_drop_count++] = old_key;
-    DBUG_PRINT("info", ("index dropped: '%s'", old_key->name));
+    DBUG_PRINT("custom_info", ("index dropped: '%s'", old_key->name));
   }
 
   /** Add key to array of indexes to be added. */
   void add_added_key(KEY *new_key) {
     index_add_buffer[index_add_count++] = (uint)(new_key - key_info_buffer);
-    DBUG_PRINT("info", ("index added: '%s'", new_key->name));
+    DBUG_PRINT("custom_info", ("index added: '%s'", new_key->name));
   }
 };
 
@@ -4350,8 +4350,9 @@ class handler {
         m_update_generated_read_fields(false),
         m_unique(nullptr),
         cloned(false) {
-    DBUG_PRINT("info", ("handler created F_UNLCK %d F_RDLCK %d F_WRLCK %d",
-                        F_UNLCK, F_RDLCK, F_WRLCK));
+    DBUG_PRINT("custom_info",
+               ("handler created F_UNLCK %d F_RDLCK %d F_WRLCK %d", F_UNLCK,
+                F_RDLCK, F_WRLCK));
     memset(index_rows_read, 0, sizeof(index_rows_read));
   }
 
@@ -5399,7 +5400,7 @@ class handler {
                                   ulonglong *first_value,
                                   ulonglong *nb_reserved_values);
   void set_next_insert_id(ulonglong id) {
-    DBUG_PRINT("info", ("auto_increment: next value %lu", (ulong)id));
+    DBUG_PRINT("custom_info", ("auto_increment: next value %lu", (ulong)id));
     next_insert_id = id;
   }
   void restore_auto_increment(ulonglong prev_insert_id) {

@@ -544,13 +544,13 @@ bool Rpl_filter::db_ok_with_wild_table(const char *db) {
   len = end - hash_key;
   if (wild_do_table_inited && find_wild(&wild_do_table, hash_key, len)) {
     wild_do_table_statistics.increase_counter();
-    DBUG_PRINT("return", ("1"));
+    DBUG_PRINT("custom_info", ("1"));
     return true;
   }
   if (wild_ignore_table_inited &&
       find_wild(&wild_ignore_table, hash_key, len)) {
     wild_ignore_table_statistics.increase_counter();
-    DBUG_PRINT("return", ("0"));
+    DBUG_PRINT("custom_info", ("0"));
     return false;
   }
 
@@ -558,7 +558,7 @@ bool Rpl_filter::db_ok_with_wild_table(const char *db) {
     If no explicit rule found and there was a do list, do not replicate.
     If there was no do list, go ahead
   */
-  DBUG_PRINT("return", ("db=%s,retval=%d", db, !wild_do_table_inited));
+  DBUG_PRINT("custom_info", ("db=%s,retval=%d", db, !wild_do_table_inited));
   return !wild_do_table_inited;
 }
 

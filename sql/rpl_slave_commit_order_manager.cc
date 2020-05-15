@@ -62,8 +62,8 @@ void Commit_order_manager::register_trx(Slave_worker *worker) {
   DBUG_TRACE;
 
   mysql_mutex_lock(&m_mutex);
-  DBUG_PRINT("info", ("Worker %d added to the commit order queue",
-                      (int)worker->info_thd->thread_id()));
+  DBUG_PRINT("custom_info", ("Worker %d added to the commit order queue",
+                             (int)worker->info_thd->thread_id()));
 
   /* only transition allowed: FINISHED -> REGISTERED */
   DBUG_ASSERT(m_workers[worker->id].stage == enum_transaction_stage::FINISHED);
@@ -86,7 +86,8 @@ bool Commit_order_manager::wait(Slave_worker *worker) {
     mysql_cond_t *cond = &m_workers[worker->id].cond;
     THD *thd = worker->info_thd;
 
-    DBUG_PRINT("info", ("Worker %lu is waiting for commit signal", worker->id));
+    DBUG_PRINT("custom_info",
+               ("Worker %lu is waiting for commit signal", worker->id));
     CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("commit_order_manager_before_wait");
     mysql_mutex_lock(&m_mutex);
     thd->ENTER_COND(cond, &m_mutex,
@@ -123,7 +124,8 @@ bool Commit_order_manager::wait(Slave_worker *worker) {
     if (rollback_status) {
       finish_one(worker);
 
-      DBUG_PRINT("info", ("thd has seen an error signal from old thread"));
+      DBUG_PRINT("custom_info",
+                 ("thd has seen an error signal from old thread"));
       thd->get_stmt_da()->set_overwrite_status(true);
       my_error(ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR, MYF(0));
     }
@@ -232,7 +234,7 @@ void Commit_order_manager::finish(Slave_worker *worker) {
   DBUG_TRACE;
 
   if (m_workers[worker->id].stage == enum_transaction_stage::WAITED) {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Worker %lu is signalling next transaction", worker->id));
 
     if (!get_rollback_status() &&
@@ -268,7 +270,7 @@ void Commit_order_manager::check_and_report_deadlock(THD *thd_self,
   /* Check if both workers are working for the same channel */
   if (mngr != nullptr && self_w->c_rli == wait_for_w->c_rli &&
       wait_for_w->sequence_number() > self_w->sequence_number()) {
-    DBUG_PRINT("info", ("Found slave order commit deadlock"));
+    DBUG_PRINT("custom_info", ("Found slave order commit deadlock"));
     mngr->report_deadlock(wait_for_w);
   }
 }

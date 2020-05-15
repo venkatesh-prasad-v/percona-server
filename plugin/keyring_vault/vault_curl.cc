@@ -87,7 +87,9 @@ int progress_callback(void *clientp MY_ATTRIBUTE((unused)), double dltotal,
   ulonglong curr_ping_time = my_timer_milliseconds();
 
   DBUG_EXECUTE_IF("vault_network_lag", {
+#ifndef NDEBUG
     curr_ping_time = last_ping_time + slow_connection_threshold + 10;
+#endif
     dltotal = 1;
     dlnow = 0;
   });

@@ -2541,7 +2541,7 @@ class THD : public MDL_context_owner,
     DBUG_TRACE;
     DBUG_ASSERT(((file == 0) && (pos == 0)) || ((file != 0) && (pos != 0)));
     if (file) {
-      DBUG_PRINT("enter", ("file: %s, pos: %llu", file, pos));
+      DBUG_PRINT("custom_info", ("file: %s, pos: %llu", file, pos));
       // Only the file name should be used, not the full path
       m_trans_log_file = file + dirname_length(file);
       if (!m_trans_fixed_log_file)
@@ -2554,7 +2554,7 @@ class THD : public MDL_context_owner,
     }
 
     m_trans_end_pos = pos;
-    DBUG_PRINT("return",
+    DBUG_PRINT("custom_info",
                ("m_trans_log_file: %s, m_trans_fixed_log_file: %s, "
                 "m_trans_end_pos: %llu",
                 m_trans_log_file, m_trans_fixed_log_file, m_trans_end_pos));
@@ -2565,7 +2565,7 @@ class THD : public MDL_context_owner,
     DBUG_TRACE;
     if (file_var) *file_var = m_trans_log_file;
     if (pos_var) *pos_var = m_trans_end_pos;
-    DBUG_PRINT("return",
+    DBUG_PRINT("custom_info",
                ("file: %s, pos: %llu", file_var ? *file_var : "<none>",
                 pos_var ? *pos_var : 0));
     return;
@@ -2575,7 +2575,7 @@ class THD : public MDL_context_owner,
     DBUG_TRACE;
     if (file_var) *file_var = m_trans_fixed_log_file;
     if (pos_var) *pos_var = m_trans_end_pos;
-    DBUG_PRINT("return",
+    DBUG_PRINT("custom_info",
                ("file: %s, pos: %llu", file_var ? *file_var : "<none>",
                 pos_var ? *pos_var : 0));
     return;
@@ -3393,8 +3393,9 @@ class THD : public MDL_context_owner,
   }
   inline void reset_current_stmt_binlog_format_row() {
     DBUG_TRACE;
-    DBUG_PRINT("debug", ("in_sub_stmt: %d, system_thread: %s", in_sub_stmt != 0,
-                         show_system_thread(system_thread)));
+    DBUG_PRINT("custom_info",
+               ("in_sub_stmt: %d, system_thread: %s", in_sub_stmt != 0,
+                show_system_thread(system_thread)));
     if (in_sub_stmt == 0) {
       if (variables.binlog_format == BINLOG_FORMAT_ROW)
         set_current_stmt_binlog_format_row();

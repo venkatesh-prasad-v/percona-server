@@ -218,9 +218,9 @@ enum enum_return_id Rpl_info_table_access::scan_info(TABLE *table,
         break;
 
       default:
-        DBUG_PRINT("info", ("Failed to get next record"
-                            " (ha_rnd_next returns %d)",
-                            error));
+        DBUG_PRINT("custom_info", ("Failed to get next record"
+                                   " (ha_rnd_next returns %d)",
+                                   error));
         ret = ERROR_ID;
         break;
     }
@@ -267,9 +267,9 @@ bool Rpl_info_table_access::count_info(TABLE *table, uint *counter) {
         break;
 
       default:
-        DBUG_PRINT("info", ("Failed to get next record"
-                            " (ha_rnd_next returns %d)",
-                            error));
+        DBUG_PRINT("custom_info", ("Failed to get next record"
+                                   " (ha_rnd_next returns %d)",
+                                   error));
         break;
     }
   } while (!error);

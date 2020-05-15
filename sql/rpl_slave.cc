@@ -469,7 +469,7 @@ int init_slave() {
     Master_info *default_mi;
     default_mi = channel_map.get_default_channel_mi();
     if (default_mi && default_mi->rli) {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("init group master %s %lu  group relay %s %lu event %s %lu\n",
                   default_mi->rli->get_group_master_log_name(),
                   (ulong)default_mi->rli->get_group_master_log_pos(),
@@ -880,7 +880,7 @@ static enum_read_rotate_from_relay_log_status read_rotate_from_relay_log(
   bool done = false;
   enum_read_rotate_from_relay_log_status ret = NOT_FOUND_ROTATE;
   while (!done && (ev = relaylog_file_reader.read_event_object()) != nullptr) {
-    DBUG_PRINT("info", ("Read event of type %s", ev->get_type_str()));
+    DBUG_PRINT("custom_info", ("Read event of type %s", ev->get_type_str()));
     switch (ev->get_type_code()) {
       case binary_log::FORMAT_DESCRIPTION_EVENT:
       case binary_log::START_5_7_ENCRYPTION_EVENT:
@@ -1478,7 +1478,7 @@ static void print_slave_skip_errors(void) {
     }
     *buff = 0;
   }
-  DBUG_PRINT("init", ("error_names: '%s'", slave_skip_error_names));
+  DBUG_PRINT("custom_info", ("error_names: '%s'", slave_skip_error_names));
 }
 
 /**
@@ -1624,7 +1624,7 @@ int terminate_slave_threads(Master_info *mi, int thread_mask,
   ulong total_stop_wait_timeout = stop_wait_timeout;
 
   if (thread_mask & (SLAVE_SQL | SLAVE_FORCE_ALL)) {
-    DBUG_PRINT("info", ("Terminating SQL thread"));
+    DBUG_PRINT("custom_info", ("Terminating SQL thread"));
     mi->rli->abort_slave = true;
     if ((error = terminate_slave_thread(
              mi->rli->info_thd, sql_lock, &mi->rli->stop_cond,
@@ -1637,7 +1637,7 @@ int terminate_slave_threads(Master_info *mi, int thread_mask,
       return error;
     }
 
-    DBUG_PRINT("info", ("Flushing relay-log info file."));
+    DBUG_PRINT("custom_info", ("Flushing relay-log info file."));
     if (current_thd)
       THD_STAGE_INFO(current_thd, stage_flushing_relay_log_info_file);
 
@@ -1649,7 +1649,7 @@ int terminate_slave_threads(Master_info *mi, int thread_mask,
     }
   }
   if (thread_mask & (SLAVE_IO | SLAVE_FORCE_ALL)) {
-    DBUG_PRINT("info", ("Terminating IO thread"));
+    DBUG_PRINT("custom_info", ("Terminating IO thread"));
     mi->abort_slave = true;
     DBUG_EXECUTE_IF("pause_after_queue_event",
                     { rpl_slave_debug_point(DBUG_RPL_S_PAUSE_QUEUE_EV); });
@@ -1697,7 +1697,8 @@ int terminate_slave_threads(Master_info *mi, int thread_mask,
 
     mysql_mutex_lock(log_lock);
 
-    DBUG_PRINT("info", ("Flushing relay log and master info repository."));
+    DBUG_PRINT("custom_info",
+               ("Flushing relay log and master info repository."));
     if (current_thd)
       THD_STAGE_INFO(current_thd,
                      stage_flushing_relay_log_and_master_info_repository);
@@ -1877,7 +1878,7 @@ bool start_slave_thread(
     goto err;
   }
   start_id = *slave_run_id;
-  DBUG_PRINT("info", ("Creating new slave thread"));
+  DBUG_PRINT("custom_info", ("Creating new slave thread"));
   if (mysql_thread_create(thread_key, &th, &connection_attrib, h_func,
                           (void *)mi)) {
     LogErr(ERROR_LEVEL, ER_RPL_CANT_CREATE_SLAVE_THREAD,
@@ -2172,7 +2173,7 @@ bool sql_slave_killed(THD *thd, Relay_log_info *rli) {
           "details).";
 
       if (rli->abort_slave) {
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("Request to stop slave SQL Thread received while "
                     "applying an MTS group or a group that "
                     "has non-transactional "
@@ -2302,7 +2303,7 @@ static enum_command_status io_thread_init_command(
     Master_info *mi, const char *query, int allowed_error,
     MYSQL_RES **master_res = nullptr, MYSQL_ROW *master_row = nullptr) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("IO thread initialization command: '%s'", query));
+  DBUG_PRINT("custom_info", ("IO thread initialization command: '%s'", query));
   MYSQL *mysql = mi->mysql;
   int ret = mysql_real_query(mysql, query, static_cast<ulong>(strlen(query)));
   if (io_slave_killed(mi->info_thd, mi)) {
@@ -2978,14 +2979,14 @@ static bool wait_for_relay_log_space(Relay_log_info *rli) {
 #ifndef DBUG_OFF
     {
       char llbuf1[22], llbuf2[22];
-      DBUG_PRINT("info", ("log_space_limit=%s "
-                          "log_space_total=%s "
-                          "ignore_log_space_limit=%d "
-                          "sql_force_rotate_relay=%d",
-                          llstr(rli->log_space_limit, llbuf1),
-                          llstr(rli->log_space_total, llbuf2),
-                          (int)rli->ignore_log_space_limit,
-                          (int)rli->sql_force_rotate_relay));
+      DBUG_PRINT("custom_info", ("log_space_limit=%s "
+                                 "log_space_total=%s "
+                                 "ignore_log_space_limit=%d "
+                                 "sql_force_rotate_relay=%d",
+                                 llstr(rli->log_space_limit, llbuf1),
+                                 llstr(rli->log_space_total, llbuf2),
+                                 (int)rli->ignore_log_space_limit,
+                                 (int)rli->sql_force_rotate_relay));
     }
 #endif
     if (rli->sql_force_rotate_relay) {
@@ -3027,7 +3028,7 @@ static int write_rotate_to_master_pos_into_relay_log(THD *thd, Master_info *mi,
   DBUG_ASSERT(thd == mi->info_thd);
   mysql_mutex_assert_owner(rli->relay_log.get_log_lock());
 
-  DBUG_PRINT("info", ("writing a Rotate event to the relay log"));
+  DBUG_PRINT("custom_info", ("writing a Rotate event to the relay log"));
   Rotate_log_event *ev = new Rotate_log_event(mi->get_master_log_name(), 0,
                                               mi->get_master_log_pos(),
                                               Rotate_log_event::DUP_NAME);
@@ -3089,7 +3090,8 @@ static int write_ignored_events_info_to_relay_log(THD *thd, Master_info *mi) {
   mysql_mutex_lock(end_pos_lock);
 
   if (rli->ign_master_log_name_end[0]) {
-    DBUG_PRINT("info", ("writing a Rotate event to track down ignored events"));
+    DBUG_PRINT("custom_info",
+               ("writing a Rotate event to track down ignored events"));
     /*
       If the ignored events' info still hold, they should have same info as
       the mi->get_master_log_[name|pos].
@@ -3317,7 +3319,7 @@ static bool show_slave_status_send_data(THD *thd, Master_info *mi,
   char *slave_sql_running_state = nullptr;
   Rpl_filter *rpl_filter = mi->rli->rpl_filter;
 
-  DBUG_PRINT("info", ("host is set: '%s'", mi->host));
+  DBUG_PRINT("custom_info", ("host is set: '%s'", mi->host));
 
   protocol->start_row();
 
@@ -4136,8 +4138,8 @@ static ulong read_event(MYSQL *mysql, MYSQL_RPL *rpl, Master_info *mi,
     return packet_error;
   }
 
-  DBUG_PRINT("exit", ("len: %lu  net->read_pos[4]: %d", rpl->size,
-                      mysql->net.read_pos[4]));
+  DBUG_PRINT("custom_info", ("len: %lu  net->read_pos[4]: %d", rpl->size,
+                             mysql->net.read_pos[4]));
   return rpl->size - 1;
 }
 
@@ -4218,21 +4220,22 @@ static int sql_delay_event(Log_event *ev, THD *thd, Relay_log_info *rli) {
       if (sql_delay_end > now) {
         nap_time = sql_delay_end - now;
 
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("sql_delay= %lu "
                     "now= %ld "
                     "sql_delay_end= %ld "
                     "nap_time= %ld",
                     sql_delay, (long)now, (long)sql_delay_end, (long)nap_time));
-        DBUG_PRINT("info", ("delaying replication event %lu secs", nap_time));
+        DBUG_PRINT("custom_info",
+                   ("delaying replication event %lu secs", nap_time));
         rli->start_sql_delay(sql_delay_end);
         mysql_mutex_unlock(&rli->data_lock);
         return slave_sleep(thd, nap_time, sql_slave_killed, rli);
       } else {
-        DBUG_PRINT("info", ("sql_delay= %lu "
-                            "now= %ld "
-                            "sql_delay_end= %ld ",
-                            sql_delay, (long)now, (long)sql_delay_end));
+        DBUG_PRINT("custom_info", ("sql_delay= %lu "
+                                   "now= %ld "
+                                   "sql_delay_end= %ld ",
+                                   sql_delay, (long)now, (long)sql_delay_end));
       }
     }
   }
@@ -4306,7 +4309,7 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
   DBUG_PRINT("exec_event",
              ("%s(type_code: %d; server_id: %d)", ev->get_type_str(),
               ev->get_type_code(), ev->server_id));
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("thd->options: %s%s; rli->last_event_start_time: %lu",
               FLAGSTR(thd->variables.option_bits, OPTION_NOT_AUTOCOMMIT),
               FLAGSTR(thd->variables.option_bits, OPTION_BEGIN),
@@ -4352,7 +4355,7 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
   }
 #ifndef DBUG_OFF
   if (rli->is_mts_recovery()) {
-    DBUG_PRINT("mts",
+    DBUG_PRINT("custom_info",
                ("Mts is recovering %d, number of bits set %d, "
                 "bitmap is set %d, index %lu.\n",
                 rli->is_mts_recovery(), bitmap_bits_set(&rli->recovery_groups),
@@ -4416,8 +4419,9 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
           */
           for (uint i = 0; i < rli->curr_group_da.size(); i++) {
             Slave_job_item da_item = rli->curr_group_da[i];
-            DBUG_PRINT("mts", ("Assigning job %llu to worker %lu",
-                               (da_item.data)->common_header->log_pos, w->id));
+            DBUG_PRINT("custom_info",
+                       ("Assigning job %llu to worker %lu",
+                        (da_item.data)->common_header->log_pos, w->id));
             da_item.data->mts_group_idx =
                 rli->gaq->assigned_group_index;  // similarly to above
             if (!append_item_to_jobs_error)
@@ -4429,8 +4433,9 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
         if (append_item_to_jobs_error)
           return SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR;
 
-        DBUG_PRINT("mts", ("Assigning job %llu to worker %lu\n",
-                           job_item->data->common_header->log_pos, w->id));
+        DBUG_PRINT("custom_info",
+                   ("Assigning job %llu to worker %lu\n",
+                    job_item->data->common_header->log_pos, w->id));
 
         /* Notice `ev' instance can be destoyed after `append()' */
         if (append_item_to_jobs(job_item, w, rli))
@@ -4470,7 +4475,7 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
   set_timespec_nsec(&rli->ts_exec[1], 0);
   rli->stats_exec_time += diff_timespec(&rli->ts_exec[1], &rli->ts_exec[0]);
 
-  DBUG_PRINT("info", ("apply_event error = %d", exec_res));
+  DBUG_PRINT("custom_info", ("apply_event error = %d", exec_res));
   if (exec_res == 0) {
     /*
       Positions are not updated here when an XID is processed. To make
@@ -4506,7 +4511,7 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
           "skipped because event should be ignored",
           // EVENT_SKIP_COUNT
           "skipped because event skip counter was non-zero"};
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("OPTION_BEGIN: %d; IN_STMT: %d",
                   static_cast<bool>(thd->variables.option_bits & OPTION_BEGIN),
                   rli->get_flag(Relay_log_info::IN_STMT)));
@@ -4533,13 +4538,13 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
       if (skip_event) free_root(thd->mem_root, MYF(MY_KEEP_PREALLOC));
 
 #ifndef DBUG_OFF
-      DBUG_PRINT("info", ("update_pos error = %d", error));
+      DBUG_PRINT("custom_info", ("update_pos error = %d", error));
       if (!rli->belongs_to_client()) {
         char buf[22];
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("group %s %s", llstr(rli->get_group_relay_log_pos(), buf),
                     rli->get_group_relay_log_name()));
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("event %s %s", llstr(rli->get_event_relay_log_pos(), buf),
                     rli->get_event_relay_log_name()));
       }
@@ -4647,7 +4652,7 @@ static bool coord_handle_partial_binlogged_transaction(Relay_log_info *rli,
   THD *thd = rli->info_thd;
 
   if (!rli->curr_group_seen_begin) {
-    DBUG_PRINT("info", ("Injecting QUERY(BEGIN) to rollback worker"));
+    DBUG_PRINT("custom_info", ("Injecting QUERY(BEGIN) to rollback worker"));
     Log_event *begin_event = new Query_log_event(thd, STRING_WITH_LEN("BEGIN"),
                                                  true,  /* using_trans */
                                                  false, /* immediate */
@@ -4672,7 +4677,7 @@ static bool coord_handle_partial_binlogged_transaction(Relay_log_info *rli,
     mysql_mutex_lock(&rli->data_lock);
   }
 
-  DBUG_PRINT("info", ("Injecting QUERY(ROLLBACK) to rollback worker"));
+  DBUG_PRINT("custom_info", ("Injecting QUERY(ROLLBACK) to rollback worker"));
   Log_event *rollback_event = new Query_log_event(
       thd, STRING_WITH_LEN("ROLLBACK"), true, /* using_trans */
       false,                                  /* immediate */
@@ -4923,7 +4928,8 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
       */
       if (ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
           ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT) {
-        DBUG_PRINT("info", ("Deleting the event after it has been executed"));
+        DBUG_PRINT("custom_info",
+                   ("Deleting the event after it has been executed"));
         delete ev;
         /*
           Raii guard is explicitly instructed to invalidate
@@ -5021,9 +5027,9 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
               };);
 
 #endif
-            DBUG_PRINT("info", ("Slave retries transaction "
-                                "rli->trans_retries: %lu",
-                                rli->trans_retries));
+            DBUG_PRINT("custom_info", ("Slave retries transaction "
+                                       "rli->trans_retries: %lu",
+                                       rli->trans_retries));
           }
         } else {
           thd->fatal_error();
@@ -5044,8 +5050,9 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
           non-transient error, the slave will stop with an error.
          */
         rli->trans_retries = 0;  // restart from fresh
-        DBUG_PRINT("info", ("Resetting retry counter, rli->trans_retries: %lu",
-                            rli->trans_retries));
+        DBUG_PRINT("custom_info",
+                   ("Resetting retry counter, rli->trans_retries: %lu",
+                    rli->trans_retries));
       }
     }
     if (exec_res) {
@@ -5371,7 +5378,7 @@ extern "C" void *handle_slave_io(void *arg) {
           goto connected;
         });
 
-    DBUG_PRINT("info", ("Starting reading binary log from master"));
+    DBUG_PRINT("custom_info", ("Starting reading binary log from master"));
     while (!io_slave_killed(thd, mi)) {
       MYSQL_RPL rpl;
 
@@ -5476,9 +5483,10 @@ reading event"))
         retry_count = 0;  // ok event, reset retry counter
         THD_STAGE_INFO(thd, stage_queueing_master_event_to_the_relay_log);
         event_buf = (const char *)mysql->net.read_pos + 1;
-        DBUG_PRINT("info", ("IO thread received event of type %s",
-                            Log_event::get_type_str(
-                                (Log_event_type)event_buf[EVENT_TYPE_OFFSET])));
+        DBUG_PRINT("custom_info",
+                   ("IO thread received event of type %s",
+                    Log_event::get_type_str(
+                        (Log_event_type)event_buf[EVENT_TYPE_OFFSET])));
         if (RUN_HOOK(binlog_relay_io, after_read_event,
                      (thd, mi, (const char *)mysql->net.read_pos + 1, event_len,
                       &event_buf, &event_len))) {
@@ -5554,11 +5562,11 @@ reading event"))
 #ifndef DBUG_OFF
         {
           char llbuf1[22], llbuf2[22];
-          DBUG_PRINT("info", ("log_space_limit=%s log_space_total=%s \
+          DBUG_PRINT("custom_info", ("log_space_limit=%s log_space_total=%s \
 ignore_log_space_limit=%d",
-                              llstr(rli->log_space_limit, llbuf1),
-                              llstr(rli->log_space_total, llbuf2),
-                              (int)rli->ignore_log_space_limit));
+                                     llstr(rli->log_space_limit, llbuf1),
+                                     llstr(rli->log_space_total, llbuf2),
+                                     (int)rli->ignore_log_space_limit));
         }
 #endif
 
@@ -5909,7 +5917,7 @@ static void *handle_slave_worker(void *arg) {
 
   struct timespec stats_end;
   set_timespec_nsec(&stats_end, 0);
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("Worker %lu statistics: "
               "events processed = %lu "
               "online time = %llu "
@@ -6167,12 +6175,12 @@ bool mts_recovery_groups(Relay_log_info *rli) {
 #ifndef DBUG_OFF
             for (uint i = 0; i <= w->worker_checkpoint_seqno; i++) {
               if (bitmap_is_set(&w->group_executed, i))
-                DBUG_PRINT("mts", ("Bit %u is set.", i));
+                DBUG_PRINT("custom_info", ("Bit %u is set.", i));
               else
-                DBUG_PRINT("mts", ("Bit %u is not set.", i));
+                DBUG_PRINT("custom_info", ("Bit %u is not set.", i));
             }
 #endif
-            DBUG_PRINT("mts",
+            DBUG_PRINT("custom_info",
                        ("Doing a shift ini(%lu) end(%lu).",
                         (w->worker_checkpoint_seqno + 1) - recovery_group_cnt,
                         w->worker_checkpoint_seqno));
@@ -6181,7 +6189,7 @@ bool mts_recovery_groups(Relay_log_info *rli) {
                       j = 0;
                  i <= w->worker_checkpoint_seqno; i++, j++) {
               if (bitmap_is_set(&w->group_executed, i)) {
-                DBUG_PRINT("mts", ("Setting bit %u.", j));
+                DBUG_PRINT("custom_info", ("Setting bit %u.", j));
                 bitmap_test_and_set(groups, j);
               }
             }
@@ -6290,7 +6298,7 @@ bool mts_checkpoint_routine(Relay_log_info *rli, bool force) {
      should increment C->jobs_done by cnt.
    */
   if (!is_mts_worker(rli->info_thd) && !is_mts_db_partitioned(rli)) {
-    DBUG_PRINT("info", ("jobs_done this itr=%ld", cnt));
+    DBUG_PRINT("custom_info", ("jobs_done this itr=%ld", cnt));
     static_cast<Mts_submode_logical_clock *>(rli->current_mts_submode)
         ->jobs_done += cnt;
   }
@@ -6592,8 +6600,8 @@ static void slave_stop_workers(Relay_log_info *rli, bool *mts_inited) {
 
       mysql_mutex_unlock(&w->jobs_lock);
 
-      DBUG_PRINT("info", ("Notifying worker %lu%s to exit, thd %p", w->id,
-                          w->get_for_channel_str(), w->info_thd));
+      DBUG_PRINT("custom_info", ("Notifying worker %lu%s to exit, thd %p",
+                                 w->id, w->get_for_channel_str(), w->info_thd));
     }
   }
   thd_proc_info(thd, "Waiting for workers to exit");
@@ -6713,9 +6721,9 @@ static int report_apply_event_error(THD *thd, Relay_log_info *rli) {
   if (thd->is_error()) {
     char const *const errmsg = thd->get_stmt_da()->message_text();
 
-    DBUG_PRINT("info", ("thd->get_stmt_da()->get_mysql_errno()=%d; "
-                        "rli->last_error.number=%d",
-                        thd->get_stmt_da()->mysql_errno(), last_errno));
+    DBUG_PRINT("custom_info", ("thd->get_stmt_da()->get_mysql_errno()=%d; "
+                               "rli->last_error.number=%d",
+                               thd->get_stmt_da()->mysql_errno(), last_errno));
     if (last_errno == 0) {
       /*
         This function is reporting an error which was not reported
@@ -6946,7 +6954,7 @@ extern "C" void *handle_slave_sql(void *arg) {
     rli->ignore_log_space_limit = false;
     mysql_mutex_unlock(&rli->log_space_lock);
     rli->trans_retries = 0;  // start from "no error"
-    DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
+    DBUG_PRINT("custom_info", ("rli->trans_retries: %lu", rli->trans_retries));
 
     if (applier_reader.open(&errmsg)) {
       rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, "%s", errmsg);
@@ -7051,7 +7059,7 @@ extern "C" void *handle_slave_sql(void *arg) {
       }
 
       if (exec_relay_log_event(thd, rli, &applier_reader)) {
-        DBUG_PRINT("info", ("exec_relay_log_event() failed"));
+        DBUG_PRINT("custom_info", ("exec_relay_log_event() failed"));
 
         // do not scare the user if SQL thread was simply killed or stopped
         if (!sql_slave_killed(thd, rli)) {
@@ -7124,7 +7132,7 @@ extern "C" void *handle_slave_sql(void *arg) {
       DBUG_ASSERT(set_rli_description_event_failed);
     }
     /* Wake up master_pos_wait() */
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Signaling possibly waiting master_pos_wait() functions"));
     mysql_cond_broadcast(&rli->data_cond);
     mysql_mutex_unlock(&rli->data_lock);
@@ -7229,7 +7237,7 @@ static int process_io_rotate(Master_info *mi, Rotate_log_event *rev) {
   memcpy(const_cast<char *>(mi->get_master_log_name()), rev->new_log_ident,
          rev->ident_len + 1);
   mi->set_master_log_pos(rev->pos);
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("new (master_log_name, master_log_pos): ('%s', %lu)",
               mi->get_master_log_name(), (ulong)mi->get_master_log_pos()));
   mysql_mutex_unlock(&mi->data_lock);
@@ -7336,7 +7344,7 @@ QUEUE_EVENT_RESULT queue_event(Master_info *mi, const char *buf,
         char *debug_event_buf_c = const_cast<char *>(buf);
         int debug_cor_pos = rand() % (event_len - BINLOG_CHECKSUM_LEN);
         debug_event_buf_c[debug_cor_pos] = ~debug_event_buf_c[debug_cor_pos];
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("Corrupt the event at queue_event: byte on position %d",
                     debug_cor_pos));
         DBUG_SET("");
@@ -7578,8 +7586,9 @@ QUEUE_EVENT_RESULT queue_event(Master_info *mi, const char *buf,
          mi->get_master_log_pos()
       */
       inc_pos = uint4korr(buf + LOG_POS_OFFSET) ? event_len : 0;
-      DBUG_PRINT("info", ("binlog format is now %d",
-                          mi->get_mi_description_event()->binlog_version));
+      DBUG_PRINT("custom_info",
+                 ("binlog format is now %d",
+                  mi->get_mi_description_event()->binlog_version));
 
     } break;
 
@@ -7875,7 +7884,7 @@ QUEUE_EVENT_RESULT queue_event(Master_info *mi, const char *buf,
       mysql_mutex_lock(&mi->data_lock);
       lock_count = 2;
       mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("master_log_pos: %lu", (ulong)mi->get_master_log_pos()));
 
       /*
@@ -7886,11 +7895,12 @@ QUEUE_EVENT_RESULT queue_event(Master_info *mi, const char *buf,
 #ifndef DBUG_OFF
       if (event_type == binary_log::ANONYMOUS_GTID_LOG_EVENT) {
         if (!mi->get_queueing_trx_gtid()->is_empty()) {
-          DBUG_PRINT("info", ("Discarding Gtid(%d, %lld) as the transaction "
-                              "wasn't complete and we found an "
-                              "ANONYMOUS_GTID_LOG_EVENT.",
-                              mi->get_queueing_trx_gtid()->sidno,
-                              mi->get_queueing_trx_gtid()->gno));
+          DBUG_PRINT("custom_info",
+                     ("Discarding Gtid(%d, %lld) as the transaction "
+                      "wasn't complete and we found an "
+                      "ANONYMOUS_GTID_LOG_EVENT.",
+                      mi->get_queueing_trx_gtid()->sidno,
+                      mi->get_queueing_trx_gtid()->gno));
         }
       }
 #endif
@@ -7953,7 +7963,7 @@ end:
   }
   if (lock_count >= 2) mysql_mutex_unlock(&mi->data_lock);
   if (lock_count >= 1) mysql_mutex_unlock(log_lock);
-  DBUG_PRINT("info", ("queue result: %d", res));
+  DBUG_PRINT("custom_info", ("queue result: %d", res));
   return res;
 }
 
@@ -8027,7 +8037,7 @@ static int connect_to_master(THD *thd, MYSQL *mysql, Master_info *mi,
   mysql_options(mysql, MYSQL_OPT_READ_TIMEOUT, (char *)&slave_net_timeout);
 
   if (mi->bind_addr[0]) {
-    DBUG_PRINT("info", ("bind_addr: %s", mi->bind_addr));
+    DBUG_PRINT("custom_info", ("bind_addr: %s", mi->bind_addr));
     mysql_options(mysql, MYSQL_OPT_BIND, mi->bind_addr);
   }
 
@@ -8077,14 +8087,14 @@ static int connect_to_master(THD *thd, MYSQL *mysql, Master_info *mi,
   }
 
   if (mi->is_start_plugin_auth_configured()) {
-    DBUG_PRINT("info", ("Slaving is using MYSQL_DEFAULT_AUTH %s",
-                        mi->get_start_plugin_auth()));
+    DBUG_PRINT("custom_info", ("Slaving is using MYSQL_DEFAULT_AUTH %s",
+                               mi->get_start_plugin_auth()));
     mysql_options(mysql, MYSQL_DEFAULT_AUTH, mi->get_start_plugin_auth());
   }
 
   if (mi->is_start_plugin_dir_configured()) {
-    DBUG_PRINT("info", ("Slaving is using MYSQL_PLUGIN_DIR %s",
-                        mi->get_start_plugin_dir()));
+    DBUG_PRINT("custom_info", ("Slaving is using MYSQL_PLUGIN_DIR %s",
+                               mi->get_start_plugin_dir()));
     mysql_options(mysql, MYSQL_PLUGIN_DIR, mi->get_start_plugin_dir());
   }
   /* Set MYSQL_PLUGIN_DIR in case master asks for an external authentication
@@ -8094,12 +8104,12 @@ static int connect_to_master(THD *thd, MYSQL *mysql, Master_info *mi,
 
   if (mi->public_key_path[0]) {
     /* Set public key path */
-    DBUG_PRINT("info", ("Set master's public key path"));
+    DBUG_PRINT("custom_info", ("Set master's public key path"));
     mysql_options(mysql, MYSQL_SERVER_PUBLIC_KEY, mi->public_key_path);
   }
 
   /* Get public key from master */
-  DBUG_PRINT("info", ("Set preference to get public key from master"));
+  DBUG_PRINT("custom_info", ("Set preference to get public key from master"));
   mysql_options(mysql, MYSQL_OPT_GET_SERVER_PUBLIC_KEY, &mi->get_public_key);
 
   if (!mi->is_start_user_configured())
@@ -8175,7 +8185,7 @@ static int connect_to_master(THD *thd, MYSQL *mysql, Master_info *mi,
     thd->set_active_vio(mysql->net.vio);
   }
   mysql->reconnect = true;
-  DBUG_PRINT("exit", ("slave_was_killed: %d", slave_was_killed));
+  DBUG_PRINT("custom_info", ("slave_was_killed: %d", slave_was_killed));
   return slave_was_killed;
 }
 
@@ -8220,7 +8230,7 @@ int rotate_relay_log(Master_info *mi, bool log_master_fd, bool need_lock,
      LOCK_log, which may not be inited (if we're not a slave).
   */
   if (!rli->inited) {
-    DBUG_PRINT("info", ("rli->inited == 0"));
+    DBUG_PRINT("custom_info", ("rli->inited == 0"));
     goto end;
   }
 
@@ -9232,7 +9242,8 @@ static int change_receive_options(THD *thd, LEX_MASTER_INFO *lex_mi,
                  ER_WARN_ONLY_MASTER_LOG_FILE_NO_POS,
                  ER_THD(thd, ER_WARN_ONLY_MASTER_LOG_FILE_NO_POS));
 
-  DBUG_PRINT("info", ("master_log_pos: %lu", (ulong)mi->get_master_log_pos()));
+  DBUG_PRINT("custom_info",
+             ("master_log_pos: %lu", (ulong)mi->get_master_log_pos()));
 
   if (lex_mi->user || lex_mi->password) {
     if (!thd->get_ssl()) {
@@ -9807,7 +9818,8 @@ int change_master(THD *thd, Master_info *mi, LEX_MASTER_INFO *lex_mi,
 */
       mi->rli->set_group_master_log_pos(mi->get_master_log_pos());
       mi->rli->set_group_master_log_name(mi->get_master_log_name());
-      DBUG_PRINT("info", ("master_log_pos: %llu", mi->get_master_log_pos()));
+      DBUG_PRINT("custom_info",
+                 ("master_log_pos: %llu", mi->get_master_log_pos()));
     } else {
       const char *errmsg = nullptr;
       if (mi->rli->is_group_relay_log_name_invalid(&errmsg)) {

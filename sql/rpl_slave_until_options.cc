@@ -63,9 +63,9 @@ int Until_position::init(const char *log_name, my_off_t log_pos) {
 bool Until_position::check_position(const char *log_name, my_off_t log_pos) {
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("log_name='%s', log_pos=%llu", log_name, log_pos));
-  DBUG_PRINT("info", ("until_log_name='%s', until_log_pos=%llu",
-                      m_until_log_name, m_until_log_pos));
+  DBUG_PRINT("custom_info", ("log_name='%s', log_pos=%llu", log_name, log_pos));
+  DBUG_PRINT("custom_info", ("until_log_name='%s', until_log_pos=%llu",
+                             m_until_log_name, m_until_log_pos));
 
   if (m_rli->is_mts_in_group() || m_rli->is_in_group()) return false;
 
@@ -113,7 +113,8 @@ bool Until_master_position::check_at_start_slave() {
   strmake(m_current_log_name, m_rli->get_group_master_log_name(),
           sizeof(m_current_log_name) - 1);
   m_current_log_pos = m_rli->get_group_master_log_pos();
-  DBUG_PRINT("info", ("master log name is changed, %s", m_current_log_name));
+  DBUG_PRINT("custom_info",
+             ("master log name is changed, %s", m_current_log_name));
 
   return check_position(m_current_log_name, m_current_log_pos);
 }
@@ -128,7 +129,7 @@ bool Until_master_position::check_before_dispatching_event(
   if (!ev->is_artificial_event() && !ev->is_relay_log_event() &&
       ev->server_id != 0 && ev->common_header->log_pos != 0) {
     m_current_log_pos = ev->common_header->log_pos;
-    DBUG_PRINT("info", ("master log pos is %llu", m_current_log_pos));
+    DBUG_PRINT("custom_info", ("master log pos is %llu", m_current_log_pos));
 
     /*
       Master's events will be ignored in the cases that

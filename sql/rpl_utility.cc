@@ -124,12 +124,12 @@ static int compare_lengths(Field *field, enum_field_types source_type,
   size_t const source_length =
       max_display_length_for_field(source_type, metadata);
   size_t const target_length = field->max_display_length();
-  DBUG_PRINT("debug", ("source_length: %lu, source_type: %u,"
-                       " target_length: %lu, target_type: %u",
-                       (unsigned long)source_length, source_type,
-                       (unsigned long)target_length, field->real_type()));
+  DBUG_PRINT("custom_info", ("source_length: %lu, source_type: %u,"
+                             " target_length: %lu, target_type: %u",
+                             (unsigned long)source_length, source_type,
+                             (unsigned long)target_length, field->real_type()));
   int result = compare(source_length, target_length);
-  DBUG_PRINT("result", ("%d", result));
+  DBUG_PRINT("custom_info", ("%d", result));
   return result;
 }
 
@@ -148,9 +148,9 @@ static bool is_conversion_ok(int order) {
   allow_lossy = slave_type_conversions_options &
                 (1ULL << SLAVE_TYPE_CONVERSIONS_ALL_LOSSY);
 
-  DBUG_PRINT("enter", ("order: %d, flags:%s%s", order,
-                       allow_non_lossy ? " ALL_NON_LOSSY" : "",
-                       allow_lossy ? " ALL_LOSSY" : ""));
+  DBUG_PRINT("custom_info", ("order: %d, flags:%s%s", order,
+                             allow_non_lossy ? " ALL_NON_LOSSY" : "",
+                             allow_lossy ? " ALL_LOSSY" : ""));
   if (order < 0 && !allow_non_lossy) {
     /* !!! Add error message saying that non-lossy conversions need to be
      * allowed. */
@@ -236,10 +236,11 @@ static bool can_convert_field_to(Field *field, enum_field_types source_type,
   char field_type_buf[MAX_FIELD_WIDTH];
   String field_type(field_type_buf, sizeof(field_type_buf), &my_charset_latin1);
   field->sql_type(field_type);
-  DBUG_PRINT("enter", ("field_type: %s, target_type: %d, source_type: %d, "
-                       "source_metadata: 0x%x",
-                       field_type.c_ptr_safe(), field->real_type(), source_type,
-                       metadata));
+  DBUG_PRINT(
+      "custom_info",
+      ("field_type: %s, target_type: %d, source_type: %d, "
+       "source_metadata: 0x%x",
+       field_type.c_ptr_safe(), field->real_type(), source_type, metadata));
 #endif
   // Can't convert from scalar to array and vice versa
   if (is_array != field->is_array()) return false;
@@ -257,13 +258,13 @@ static bool can_convert_field_to(Field *field, enum_field_types source_type,
         metadata. In either case, conversion can be done but no
         conversion table is necessary.
        */
-      DBUG_PRINT("debug",
+      DBUG_PRINT("custom_info",
                  ("Base types are identical, but there is no metadata"));
       *order_var = 0;
       return true;
     }
 
-    DBUG_PRINT("debug",
+    DBUG_PRINT("custom_info",
                ("Base types are identical, doing field size comparison"));
     if (field->compatible_field_size(metadata, rli, mflags, order_var))
       return is_conversion_ok(*order_var);
@@ -309,7 +310,7 @@ static bool can_convert_field_to(Field *field, enum_field_types source_type,
     have to rely on hard-coded max-sizes for fields.
   */
 
-  DBUG_PRINT("debug", ("Base types are different, checking conversion"));
+  DBUG_PRINT("custom_info", ("Base types are different, checking conversion"));
   switch (source_type)  // Source type (on master)
   {
     case MYSQL_TYPE_DECIMAL:
@@ -470,8 +471,8 @@ bool table_def::compatible_with(THD *thd, Relay_log_info *rli, TABLE *table,
   if (dictionary && !dictionary->is_dd_table_access_allowed(
                         false, false, table->s->db.str, table->s->db.length,
                         table->s->table_name.str)) {
-    DBUG_PRINT("debug", ("Access to dictionary table %s.%s is prohibited",
-                         table->s->db.str, table->s->table_name.str));
+    DBUG_PRINT("custom_info", ("Access to dictionary table %s.%s is prohibited",
+                               table->s->db.str, table->s->table_name.str));
     rli->report(
         ERROR_LEVEL, ER_SERVER_NO_SYSTEM_TABLE_ACCESS,
         ER_THD(thd, ER_SERVER_NO_SYSTEM_TABLE_ACCESS),
@@ -494,10 +495,10 @@ bool table_def::compatible_with(THD *thd, Relay_log_info *rli, TABLE *table,
     int order;
     if (can_convert_field_to(field, type(col), field_metadata(col),
                              is_array(col), rli, m_flags, &order)) {
-      DBUG_PRINT("debug", ("Checking column %lu -"
-                           " field '%s' can be converted - order: %d",
-                           static_cast<long unsigned int>(col),
-                           field->field_name, order));
+      DBUG_PRINT("custom_info", ("Checking column %lu -"
+                                 " field '%s' can be converted - order: %d",
+                                 static_cast<long unsigned int>(col),
+                                 field->field_name, order));
       DBUG_ASSERT(order >= -1 && order <= 1);
 
       /*
@@ -519,7 +520,7 @@ bool table_def::compatible_with(THD *thd, Relay_log_info *rli, TABLE *table,
 
       if (order == 0 && tmp_table != nullptr) tmp_table->field[col] = nullptr;
     } else {
-      DBUG_PRINT("debug",
+      DBUG_PRINT("custom_info",
                  ("Checking column %lu -"
                   " field '%s' can not be converted",
                   static_cast<long unsigned int>(col), field->field_name));
@@ -574,7 +575,7 @@ bool table_def::compatible_with(THD *thd, Relay_log_info *rli, TABLE *table,
         String target_type(target_buf, sizeof(target_buf), &my_charset_latin1);
         tmp_table->field[col]->sql_type(source_type);
         table->field[col]->sql_type(target_type);
-        DBUG_PRINT("debug",
+        DBUG_PRINT("custom_info",
                    ("Field %s - conversion required."
                     " Source type: '%s', Target type: '%s'",
                     tmp_table->field[col]->field_name, source_type.c_ptr_safe(),
@@ -941,7 +942,7 @@ HASH_ROW_ENTRY *Hash_slave_rows::make_entry(const uchar *bi_start,
   return entry;
 
 err:
-  DBUG_PRINT("info", ("Hash_slave_rows::make_entry - malloc error"));
+  DBUG_PRINT("custom_info", ("Hash_slave_rows::make_entry - malloc error"));
   if (entry) my_free(entry);
   if (preamble) {
     preamble->~HASH_ROW_PREAMBLE();
@@ -967,7 +968,7 @@ bool Hash_slave_rows::put(TABLE *table, MY_BITMAP *cols,
 
   m_hash.emplace(preamble->hash_value,
                  unique_ptr<HASH_ROW_ENTRY, hash_slave_rows_free_entry>(entry));
-  DBUG_PRINT("debug",
+  DBUG_PRINT("custom_info",
              ("Added record to hash with key=%u", preamble->hash_value));
   return false;
 }
@@ -979,11 +980,12 @@ HASH_ROW_ENTRY *Hash_slave_rows::get(TABLE *table, MY_BITMAP *cols) {
 
   key = make_hash_key(table, cols);
 
-  DBUG_PRINT("debug", ("Looking for record with key=%u in the hash.", key));
+  DBUG_PRINT("custom_info",
+             ("Looking for record with key=%u in the hash.", key));
 
   const auto it = m_hash.find(key);
   if (it != m_hash.end()) {
-    DBUG_PRINT("debug", ("Found record with key=%u in the hash.", key));
+    DBUG_PRINT("custom_info", ("Found record with key=%u in the hash.", key));
 
     /**
        Save the search state in case we need to go through entries for
@@ -1018,11 +1020,12 @@ bool Hash_slave_rows::next(HASH_ROW_ENTRY **entry) {
   preamble->search_state = m_hash.end();
   preamble->is_search_state_inited = false;
 
-  DBUG_PRINT("debug",
+  DBUG_PRINT("custom_info",
              ("Looking for record with key=%u in the hash (next).", key));
 
   if (it != m_hash.end() && it->first == key) {
-    DBUG_PRINT("debug", ("Found record with key=%u in the hash (next).", key));
+    DBUG_PRINT("custom_info",
+               ("Found record with key=%u in the hash (next).", key));
     *entry = it->second.get();
     preamble = (*entry)->preamble;
 
@@ -1085,7 +1088,8 @@ uint Hash_slave_rows::make_hash_key(TABLE *table, MY_BITMAP *cols) {
    */
   if (bitmap_is_set_all(cols) && cols->n_bits == table->s->fields) {
     crc = checksum_crc32(crc, table->null_flags, table->s->null_bytes);
-    DBUG_PRINT("debug", ("make_hash_entry: hash after null_flags: %u", crc));
+    DBUG_PRINT("custom_info",
+               ("make_hash_entry: hash after null_flags: %u", crc));
   }
 
   for (Field **ptr = table->field; *ptr && ((*ptr)->field_index < cols->n_bits);
@@ -1122,8 +1126,8 @@ uint Hash_slave_rows::make_hash_key(TABLE *table, MY_BITMAP *cols) {
 #ifndef DBUG_OFF
       String tmp;
       f->val_str(&tmp);
-      DBUG_PRINT("debug", ("make_hash_entry: hash after field %s=%s: %u",
-                           f->field_name, tmp.c_ptr_safe(), crc));
+      DBUG_PRINT("custom_info", ("make_hash_entry: hash after field %s=%s: %u",
+                                 f->field_name, tmp.c_ptr_safe(), crc));
 #endif
     }
   }
@@ -1142,7 +1146,7 @@ uint Hash_slave_rows::make_hash_key(TABLE *table, MY_BITMAP *cols) {
       record[table->s->null_bytes - 1] = saved_filler;
   }
 
-  DBUG_PRINT("debug", ("Created key=%u", crc));
+  DBUG_PRINT("custom_info", ("Created key=%u", crc));
   return crc;
 }
 

@@ -252,9 +252,10 @@ end:
   DBUG_EXECUTE_IF("mts_debug_concurrent_access", {
     while (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
            mts_debug_concurrent_access < 2 && mts_debug_concurrent_access > 0) {
-      DBUG_PRINT("mts", ("Waiting while locks are acquired to show "
-                         "concurrency in mts: %u %u\n",
-                         mts_debug_concurrent_access, thd->thread_id()));
+      DBUG_PRINT("custom_info",
+                 ("Waiting while locks are acquired to show "
+                  "concurrency in mts: %u %u\n",
+                  mts_debug_concurrent_access, thd->thread_id()));
       my_sleep(6000000);
     }
   };);

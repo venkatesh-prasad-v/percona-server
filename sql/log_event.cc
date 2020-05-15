@@ -1116,11 +1116,12 @@ Log_event::enum_skip_reason Log_event::do_shall_skip(Relay_log_info *rli) {
     - Other events will decrease the counter unless OPTION_BEGIN is
       set.
   */
-  DBUG_PRINT("info", ("ev->server_id=%lu, ::server_id=%lu,"
-                      " rli->replicate_same_server_id=%d,"
-                      " rli->slave_skip_counter=%d",
-                      (ulong)server_id, (ulong)::server_id,
-                      rli->replicate_same_server_id, rli->slave_skip_counter));
+  DBUG_PRINT("custom_info",
+             ("ev->server_id=%lu, ::server_id=%lu,"
+              " rli->replicate_same_server_id=%d,"
+              " rli->slave_skip_counter=%d",
+              (ulong)server_id, (ulong)::server_id,
+              rli->replicate_same_server_id, rli->slave_skip_counter));
   if ((server_id == ::server_id && !rli->replicate_same_server_id) ||
       (rli->slave_skip_counter == 1 && rli->is_in_group()))
     return EVENT_SKIP_IGNORE;
@@ -2694,8 +2695,8 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli) {
       group.reset(common_header->log_pos, rli->mts_groups_assigned);
       // the last occupied GAQ's array index
       gaq->assigned_group_index = gaq->en_queue(&group);
-      DBUG_PRINT("info", ("gaq_idx= %ld  gaq->size=%ld",
-                          gaq->assigned_group_index, gaq->size));
+      DBUG_PRINT("custom_info", ("gaq_idx= %ld  gaq->size=%ld",
+                                 gaq->assigned_group_index, gaq->size));
       DBUG_ASSERT(gaq->assigned_group_index != MTS_WORKER_UNDEF);
       DBUG_ASSERT(gaq->assigned_group_index < gaq->size);
       DBUG_ASSERT(gaq->get_job_group(rli->gaq->assigned_group_index)
@@ -3099,7 +3100,7 @@ int Log_event::apply_gtid_event(Relay_log_info *rli) {
 */
 int Log_event::apply_event(Relay_log_info *rli) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("event_type=%s", get_type_str()));
+  DBUG_PRINT("custom_info", ("event_type=%s", get_type_str()));
   bool parallel = false;
   enum enum_mts_event_exec_mode actual_exec_mode = EVENT_EXEC_PARALLEL;
   THD *rli_thd = rli->info_thd;
@@ -3296,7 +3297,7 @@ int Log_event::apply_event(Relay_log_info *rli) {
 
 #ifndef DBUG_OFF
   if (rli->last_assigned_worker)
-    DBUG_PRINT("mts",
+    DBUG_PRINT("custom_info",
                ("Assigning job to worker %lu", rli->last_assigned_worker->id));
 #endif
 
@@ -4095,8 +4096,8 @@ Query_log_event::Query_log_event(THD *thd_arg, const char *query_arg,
 
   DBUG_ASSERT(event_cache_type != Log_event::EVENT_INVALID_CACHE);
   DBUG_ASSERT(event_logging_type != Log_event::EVENT_INVALID_LOGGING);
-  DBUG_PRINT("info", ("Query_log_event has flags2: %lu  sql_mode: %llu",
-                      (ulong)flags2, (ulonglong)sql_mode));
+  DBUG_PRINT("custom_info", ("Query_log_event has flags2: %lu  sql_mode: %llu",
+                             (ulong)flags2, (ulonglong)sql_mode));
 }
 #endif /* MYSQL_SERVER */
 
@@ -4425,8 +4426,8 @@ static bool is_silent_error(THD *thd) {
       thd->get_stmt_da()->sql_conditions();
   const Sql_condition *err;
   while ((err = it++)) {
-    DBUG_PRINT("info", ("has condition %d %s", err->mysql_errno(),
-                        err->message_text()));
+    DBUG_PRINT("custom_info", ("has condition %d %s", err->mysql_errno(),
+                               err->message_text()));
     switch (err->mysql_errno()) {
       case ER_SLAVE_SILENT_RETRY_TRANSACTION: {
         return true;
@@ -4460,8 +4461,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   DBUG_TRACE;
   int expected_error, actual_error = 0;
 
-  DBUG_PRINT("info", ("query=%s, q_len_arg=%lu", query,
-                      static_cast<unsigned long>(q_len_arg)));
+  DBUG_PRINT("custom_info", ("query=%s, q_len_arg=%lu", query,
+                             static_cast<unsigned long>(q_len_arg)));
 
   /*
     Colleagues: please never free(thd->catalog) in MySQL. This would
@@ -4483,9 +4484,10 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   bool is_invalid_db_name =
       validate_string(system_charset_info, db, db_len, &valid_len, &len_error);
 
-  DBUG_PRINT("debug", ("is_invalid_db_name= %s, valid_len=%zu, len_error=%s",
-                       is_invalid_db_name ? "true" : "false", valid_len,
-                       len_error ? "true" : "false"));
+  DBUG_PRINT("custom_info",
+             ("is_invalid_db_name= %s, valid_len=%zu, len_error=%s",
+              is_invalid_db_name ? "true" : "false", valid_len,
+              len_error ? "true" : "false"));
 
   if (is_invalid_db_name || len_error) {
     rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
@@ -4573,7 +4575,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     thd->set_query_for_display(query_arg, q_len_arg);
     thd->set_query_id(next_query_id());
     attach_temp_tables_worker(thd, rli);
-    DBUG_PRINT("query", ("%s", thd->query().str));
+    DBUG_PRINT("custom_info", ("%s", thd->query().str));
 
     DBUG_EXECUTE_IF("simulate_error_in_ddl", error_code = 1051;);
 
@@ -4937,8 +4939,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
       code, and it should be ignored or is related to a concurrency issue.
     */
     actual_error = thd->is_error() ? thd->get_stmt_da()->mysql_errno() : 0;
-    DBUG_PRINT("info", ("expected_error: %d  sql_errno: %d", expected_error,
-                        actual_error));
+    DBUG_PRINT("custom_info", ("expected_error: %d  sql_errno: %d",
+                               expected_error, actual_error));
 
     if (actual_error != 0 && expected_error == actual_error) {
       if (!has_ddl_committed &&                  // Slave didn't commit a DDL
@@ -4992,7 +4994,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     else if ((expected_error == actual_error &&
               !concurrency_error_code(expected_error)) ||
              ignored_error_code(actual_error)) {
-      DBUG_PRINT("info", ("error ignored"));
+      DBUG_PRINT("custom_info", ("error ignored"));
       if (actual_error && ignored_error_code(actual_error)) {
         if (actual_error == ER_SLAVE_IGNORED_TABLE) {
           if (!slave_ignored_err_throttle.log())
@@ -5084,7 +5086,7 @@ end:
   thd->set_db(NULL_CSTR); /* will free the current database */
   thd->reset_query();
   thd->lex->sql_command = SQLCOM_END;
-  DBUG_PRINT("info", ("end: query= 0"));
+  DBUG_PRINT("custom_info", ("end: query= 0"));
 
   /* Mark the statement completed. */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
@@ -5129,7 +5131,8 @@ int Query_log_event::do_update_pos(Relay_log_info *rli) {
 Log_event::enum_skip_reason Query_log_event::do_shall_skip(
     Relay_log_info *rli) {
   DBUG_TRACE;
-  DBUG_PRINT("debug", ("query: %s; q_len: %d", query, static_cast<int>(q_len)));
+  DBUG_PRINT("custom_info",
+             ("query: %s; q_len: %d", query, static_cast<int>(q_len)));
   DBUG_ASSERT(query && q_len > 0);
 
   if (rli->slave_skip_counter > 0) {
@@ -5608,8 +5611,9 @@ Rotate_log_event::Rotate_log_event(const char *new_log_ident_arg,
 
 #ifndef DBUG_OFF
   char buff[22];
-  DBUG_PRINT("enter", ("new_log_ident: %s  pos: %s  flags: %lu",
-                       new_log_ident_arg, llstr(pos_arg, buff), (ulong)flags));
+  DBUG_PRINT("custom_info",
+             ("new_log_ident: %s  pos: %s  flags: %lu", new_log_ident_arg,
+              llstr(pos_arg, buff), (ulong)flags));
 #endif
   if (flags & DUP_NAME)
     new_log_ident = my_strndup(key_memory_log_event, new_log_ident_arg,
@@ -5625,7 +5629,7 @@ Rotate_log_event::Rotate_log_event(
       Log_event(header(), footer()) {
   DBUG_TRACE;
   if (!is_valid()) return;
-  DBUG_PRINT("debug", ("new_log_ident: '%s'", new_log_ident));
+  DBUG_PRINT("custom_info", ("new_log_ident: '%s'", new_log_ident));
 }
 
 /*
@@ -5669,10 +5673,10 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
   char buf[32];
 #endif
 
-  DBUG_PRINT("info", ("server_id=%lu; ::server_id=%lu", (ulong)this->server_id,
-                      (ulong)::server_id));
-  DBUG_PRINT("info", ("new_log_ident: %s", this->new_log_ident));
-  DBUG_PRINT("info", ("pos: %s", llstr(this->pos, buf)));
+  DBUG_PRINT("custom_info", ("server_id=%lu; ::server_id=%lu",
+                             (ulong)this->server_id, (ulong)::server_id));
+  DBUG_PRINT("custom_info", ("new_log_ident: %s", this->new_log_ident));
+  DBUG_PRINT("custom_info", ("pos: %s", llstr(this->pos, buf)));
 
   /*
     If we are in a transaction or in a group: the only normal case is
@@ -5716,10 +5720,10 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
     }
 
     mysql_mutex_lock(&rli->data_lock);
-    DBUG_PRINT("info", ("old group_master_log_name: '%s'  "
-                        "old group_master_log_pos: %lu",
-                        rli->get_group_master_log_name(),
-                        (ulong)rli->get_group_master_log_pos()));
+    DBUG_PRINT("custom_info", ("old group_master_log_name: '%s'  "
+                               "old group_master_log_pos: %lu",
+                               rli->get_group_master_log_name(),
+                               (ulong)rli->get_group_master_log_pos()));
 
     memcpy(const_cast<char *>(rli->get_group_master_log_name()), new_log_ident,
            ident_len + 1);
@@ -5739,10 +5743,10 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
       goto err;
     }
 
-    DBUG_PRINT("info", ("new group_master_log_name: '%s'  "
-                        "new group_master_log_pos: %lu",
-                        rli->get_group_master_log_name(),
-                        (ulong)rli->get_group_master_log_pos()));
+    DBUG_PRINT("custom_info", ("new group_master_log_name: '%s'  "
+                               "new group_master_log_pos: %lu",
+                               rli->get_group_master_log_name(),
+                               (ulong)rli->get_group_master_log_pos()));
     mysql_mutex_unlock(&rli->data_lock);
 
     if (rli->is_parallel_exec()) {
@@ -6145,7 +6149,7 @@ int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w) {
                                  "COMMIT /* implicit, from Xid_log_event */");
 
   DBUG_PRINT(
-      "mts",
+      "custom_info",
       ("do_apply group master %s %llu  group relay %s %llu event %s %llu.",
        w->get_group_master_log_name(), w->get_group_master_log_pos(),
        w->get_group_relay_log_name(), w->get_group_relay_log_pos(),
@@ -6173,7 +6177,7 @@ int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w) {
   }
 
   DBUG_PRINT(
-      "mts",
+      "custom_info",
       ("do_apply group master %s %llu  group relay %s %llu event %s %llu.",
        w->get_group_master_log_name(), w->get_group_master_log_pos(),
        w->get_group_relay_log_name(), w->get_group_relay_log_pos(),
@@ -6313,12 +6317,13 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli) {
   rli_ptr->set_group_relay_log_name(saved_group_relay_log_name);
   rli_ptr->set_group_relay_log_pos(saved_group_relay_log_pos);
 
-  DBUG_PRINT("info", ("Rolling back to group master %s %llu  group relay %s"
-                      " %llu\n",
-                      rli_ptr->get_group_master_log_name(),
-                      rli_ptr->get_group_master_log_pos(),
-                      rli_ptr->get_group_relay_log_name(),
-                      rli_ptr->get_group_relay_log_pos()));
+  DBUG_PRINT(
+      "custom_info",
+      ("Rolling back to group master %s %llu  group relay %s"
+       " %llu\n",
+       rli_ptr->get_group_master_log_name(),
+       rli_ptr->get_group_master_log_pos(), rli_ptr->get_group_relay_log_name(),
+       rli_ptr->get_group_relay_log_pos()));
   mysql_mutex_unlock(&rli_ptr->data_lock);
   error = do_commit(thd);
   mysql_mutex_lock(&rli_ptr->data_lock);
@@ -6339,12 +6344,13 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli) {
     rli_ptr->set_group_relay_log_name(new_group_relay_log_name);
     rli_ptr->set_group_relay_log_pos(new_group_relay_log_pos);
 
-    DBUG_PRINT("info", ("Updating positions on succesful commit to group master"
-                        " %s %llu  group relay %s %llu\n",
-                        rli_ptr->get_group_master_log_name(),
-                        rli_ptr->get_group_master_log_pos(),
-                        rli_ptr->get_group_relay_log_name(),
-                        rli_ptr->get_group_relay_log_pos()));
+    DBUG_PRINT("custom_info",
+               ("Updating positions on succesful commit to group master"
+                " %s %llu  group relay %s %llu\n",
+                rli_ptr->get_group_master_log_name(),
+                rli_ptr->get_group_master_log_pos(),
+                rli_ptr->get_group_relay_log_name(),
+                rli_ptr->get_group_relay_log_pos()));
 
     /*
       For transactional repository the positions are flushed ahead of commit.
@@ -7986,7 +7992,8 @@ int Rows_log_event::do_add_row_data(uchar *row_data, size_t length) {
     would save binlog space. TODO
   */
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("row_data: %p  length: %lu", row_data, (ulong)length));
+  DBUG_PRINT("custom_info",
+             ("row_data: %p  length: %lu", row_data, (ulong)length));
 
   /*
     If length is zero, there is nothing to write, so we just
@@ -8184,14 +8191,14 @@ static uint search_key_in_table(TABLE *table, MY_BITMAP *bi_cols,
   uint key;
 
   if (key_type & PRI_KEY_FLAG && (table->s->primary_key < MAX_KEY)) {
-    DBUG_PRINT("debug", ("Searching for PK"));
+    DBUG_PRINT("custom_info", ("Searching for PK"));
     keyinfo = table->s->key_info + table->s->primary_key;
     if (are_all_columns_signaled_for_key(keyinfo, bi_cols))
       return table->s->primary_key;
   }
 
   if (key_type & UNIQUE_KEY_FLAG) {
-    DBUG_PRINT("debug", ("Searching for UK"));
+    DBUG_PRINT("custom_info", ("Searching for UK"));
     for (key = 0, keyinfo = table->key_info;
          (key < table->s->keys) && (res == MAX_KEY); key++, keyinfo++) {
       /*
@@ -8213,11 +8220,12 @@ static uint search_key_in_table(TABLE *table, MY_BITMAP *bi_cols,
 
       if (res < MAX_KEY) return res;
     }
-    DBUG_PRINT("debug", ("UK has NULLABLE parts or not all columns signaled."));
+    DBUG_PRINT("custom_info",
+               ("UK has NULLABLE parts or not all columns signaled."));
   }
 
   if (key_type & MULTIPLE_KEY_FLAG && table->s->keys) {
-    DBUG_PRINT("debug", ("Searching for K."));
+    DBUG_PRINT("custom_info", ("Searching for K."));
     for (key = 0, keyinfo = table->key_info;
          (key < table->s->keys) && (res == MAX_KEY); key++, keyinfo++) {
       /*
@@ -8244,7 +8252,7 @@ static uint search_key_in_table(TABLE *table, MY_BITMAP *bi_cols,
 
       if (res < MAX_KEY) return res;
     }
-    DBUG_PRINT("debug", ("Not all columns signaled for K."));
+    DBUG_PRINT("custom_info", ("Not all columns signaled for K."));
   }
 
   return res;
@@ -8308,7 +8316,7 @@ void Rows_log_event::decide_row_lookup_algorithm_and_key() {
   this->m_key_index =
       search_key_in_table(table, cols, (PRI_KEY_FLAG | UNIQUE_KEY_FLAG));
   if (this->m_key_index != MAX_KEY) {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("decide_row_lookup_algorithm_and_key: decided - INDEX_SCAN"));
     this->m_rows_lookup_algorithm = ROW_LOOKUP_INDEX_SCAN;
     goto end;
@@ -8331,7 +8339,7 @@ TABLE_OR_INDEX_HASH_SCAN:
   if (m_key_index < MAX_KEY)
     m_distinct_key_spare_buf =
         (uchar *)thd->alloc(table->key_info[m_key_index].key_length);
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("decide_row_lookup_algorithm_and_key: decided - HASH_SCAN"));
   goto end;
 
@@ -8345,11 +8353,11 @@ TABLE_OR_INDEX_FULL_SCAN:
         table, cols, (PRI_KEY_FLAG | UNIQUE_KEY_FLAG | MULTIPLE_KEY_FLAG));
 
   if (this->m_key_index != MAX_KEY) {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("decide_row_lookup_algorithm_and_key: decided - INDEX_SCAN"));
     this->m_rows_lookup_algorithm = ROW_LOOKUP_INDEX_SCAN;
   } else {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("decide_row_lookup_algorithm_and_key: decided - TABLE_SCAN"));
     this->m_rows_lookup_algorithm = ROW_LOOKUP_TABLE_SCAN;
   }
@@ -8373,7 +8381,7 @@ end:
 
   // only for testing purposes
   slave_rows_last_search_algorithm_used = m_rows_lookup_algorithm;
-  DBUG_PRINT("debug", ("Row lookup method: %s", s));
+  DBUG_PRINT("custom_info", ("Row lookup method: %s", s));
 #endif
 }
 
@@ -8584,8 +8592,8 @@ void Rows_log_event::do_post_row_operations(Relay_log_info const *rli,
     m_curr_row_end.
   */
 
-  DBUG_PRINT("info", ("curr_row: %p; curr_row_end: %p; rows_end: %p",
-                      m_curr_row, m_curr_row_end, m_rows_end));
+  DBUG_PRINT("custom_info", ("curr_row: %p; curr_row_end: %p; rows_end: %p",
+                             m_curr_row, m_curr_row_end, m_rows_end));
 
   if (!m_curr_row_end && !error) {
     /*
@@ -8705,7 +8713,7 @@ int Rows_log_event::do_apply_row(Relay_log_info const *rli) {
   error = do_exec_row(rli);
 
   if (error) {
-    DBUG_PRINT("info", ("error: %s", HA_ERR(error)));
+    DBUG_PRINT("custom_info", ("error: %s", HA_ERR(error)));
     DBUG_ASSERT(error != HA_ERR_RECORD_DELETED);
   }
   m_table->in_use = old_thd;
@@ -8789,7 +8797,8 @@ int Rows_log_event::next_record_scan(bool first_read) {
     if (first_read)
       if ((error = table->file->ha_index_read_map(
                table->record[0], m_key, HA_WHOLE_KEY, HA_READ_KEY_EXACT))) {
-        DBUG_PRINT("info", ("no record matching the key found in the table"));
+        DBUG_PRINT("custom_info",
+                   ("no record matching the key found in the table"));
         error = HA_ERR_KEY_NOT_FOUND;
       }
   }
@@ -8829,22 +8838,22 @@ int Rows_log_event::open_record_scan() {
      */
     store_record(table, record[1]);
 
-    DBUG_PRINT("info", ("locating record using a key (index_read)"));
+    DBUG_PRINT("custom_info", ("locating record using a key (index_read)"));
 
     /* The m_key_index'th key is active and usable: search the table using the
      * index */
     if (!table->file->inited &&
         (error = table->file->ha_index_init(m_key_index, false))) {
-      DBUG_PRINT("info", ("ha_index_init returns error %d", error));
+      DBUG_PRINT("custom_info", ("ha_index_init returns error %d", error));
       goto end;
     }
 
     DBUG_DUMP("key data", m_key, m_key_info->key_length);
   } else {
     if ((error = table->file->ha_rnd_init(true))) {
-      DBUG_PRINT("info", ("error initializing table scan"
-                          " (ha_rnd_init returns %d)",
-                          error));
+      DBUG_PRINT("custom_info", ("error initializing table scan"
+                                 " (ha_rnd_init returns %d)",
+                                 error));
       table->file->print_error(error, MYF(0));
     }
   }
@@ -8909,7 +8918,7 @@ int Rows_log_event::do_index_scan_and_update(Relay_log_info const *rli) {
   }
 
 #ifndef DBUG_OFF
-  DBUG_PRINT("info", ("looking for the following record"));
+  DBUG_PRINT("custom_info", ("looking for the following record"));
   DBUG_DUMP("record[0]", m_table->record[0], m_table->s->reclength);
 #endif
 
@@ -8922,7 +8931,7 @@ int Rows_log_event::do_index_scan_and_update(Relay_log_info const *rli) {
       Read removal is possible since the engine supports write without
       previous read using full primary key
     */
-    DBUG_PRINT("info", ("using read before write removal"));
+    DBUG_PRINT("custom_info", ("using read before write removal"));
     DBUG_ASSERT(m_key_index == m_table->s->primary_key);
 
     /*
@@ -8955,14 +8964,14 @@ int Rows_log_event::do_index_scan_and_update(Relay_log_info const *rli) {
 
     */
 
-    DBUG_PRINT("info", ("locating record using primary key (position)"));
+    DBUG_PRINT("custom_info", ("locating record using primary key (position)"));
     if (m_table->file->inited && (error = m_table->file->ha_index_end()))
       goto end;
 
     error = m_table->file->rnd_pos_by_record(m_table->record[0]);
 
     if (error) {
-      DBUG_PRINT("info", ("rnd_pos returns error %d", error));
+      DBUG_PRINT("custom_info", ("rnd_pos returns error %d", error));
       if (error == HA_ERR_RECORD_DELETED) error = HA_ERR_KEY_NOT_FOUND;
     }
 
@@ -8979,12 +8988,13 @@ INDEX_SCAN:
 
   error = next_record_scan(true);
   if (error) {
-    DBUG_PRINT("info", ("no record matching the key found in the table"));
+    DBUG_PRINT("custom_info",
+               ("no record matching the key found in the table"));
     if (error == HA_ERR_RECORD_DELETED) error = HA_ERR_KEY_NOT_FOUND;
     goto end;
   }
 
-  DBUG_PRINT("info", ("found first matching record"));
+  DBUG_PRINT("custom_info", ("found first matching record"));
   DBUG_DUMP("record[0]", m_table->record[0], m_table->s->reclength);
   /*
     Below is a minor "optimization".  If the key (i.e., key number
@@ -9028,13 +9038,14 @@ INDEX_SCAN:
     and find the one which is identical to the row given. A copy of the
     record we are looking for is stored in record[1].
    */
-  DBUG_PRINT("info", ("non-unique index, scanning it to find matching record"));
+  DBUG_PRINT("custom_info",
+             ("non-unique index, scanning it to find matching record"));
 
   while (record_compare(m_table, &this->m_local_cols)) {
     while ((error = next_record_scan(false))) {
       /* We just skip records that has already been deleted */
       if (error == HA_ERR_RECORD_DELETED) continue;
-      DBUG_PRINT("info", ("no record matching the given row found"));
+      DBUG_PRINT("custom_info", ("no record matching the given row found"));
       goto end;
     }
   }
@@ -9206,7 +9217,8 @@ int Rows_log_event::do_scan_and_update(Relay_log_info const *rli) {
   saved_last_m_curr_row = m_curr_row;
   saved_last_m_curr_row_end = m_curr_row_end;
 
-  DBUG_PRINT("info", ("Hash was populated with %d records!", m_hash.size()));
+  DBUG_PRINT("custom_info",
+             ("Hash was populated with %d records!", m_hash.size()));
 
   /* open table or index depending on whether we have set m_key_index or not. */
   if ((error = open_record_scan())) goto err;
@@ -9220,7 +9232,7 @@ int Rows_log_event::do_scan_and_update(Relay_log_info const *rli) {
     error = next_record_scan(i == 0);
     i++;
 
-    if (error) DBUG_PRINT("info", ("error: %s", HA_ERR(error)));
+    if (error) DBUG_PRINT("custom_info", ("error: %s", HA_ERR(error)));
     switch (error) {
       case 0: {
         entry = m_hash.get(table, &this->m_local_cols);
@@ -9325,15 +9337,15 @@ int Rows_log_event::do_scan_and_update(Relay_log_info const *rli) {
          (!error || (error == HA_ERR_RECORD_DELETED)));
 
 close_table:
-  DBUG_PRINT("info", ("m_hash.size()=%d error=%d idempotent_errors=%d",
-                      m_hash.size(), error, idempotent_errors));
+  DBUG_PRINT("custom_info", ("m_hash.size()=%d error=%d idempotent_errors=%d",
+                             m_hash.size(), error, idempotent_errors));
   if (error == HA_ERR_RECORD_DELETED) error = 0;
 
   if (error) {
     table->file->print_error(error, MYF(0));
-    DBUG_PRINT("info", ("Failed to get next record"
-                        " (ha_rnd_next returns %d)",
-                        error));
+    DBUG_PRINT("custom_info", ("Failed to get next record"
+                               " (ha_rnd_next returns %d)",
+                               error));
     /*
       we are already with errors. Keep the error code and
       try to close the scan anyway.
@@ -9369,7 +9381,8 @@ int Rows_log_event::do_hash_scan_and_update(Relay_log_info const *rli) {
    * part. */
   if (m_curr_row_end < m_rows_end) return 0;
 
-  DBUG_PRINT("info", ("Hash was populated with %d records!", m_hash.size()));
+  DBUG_PRINT("custom_info",
+             ("Hash was populated with %d records!", m_hash.size()));
   DBUG_ASSERT(m_curr_row_end == m_rows_end);
 
   // SCANNING & UPDATE PART
@@ -9384,7 +9397,7 @@ int Rows_log_event::do_table_scan_and_update(Relay_log_info const *rli) {
 
   DBUG_TRACE;
   DBUG_ASSERT(m_curr_row != m_rows_end);
-  DBUG_PRINT("info", ("locating record using table scan (ha_rnd_next)"));
+  DBUG_PRINT("custom_info", ("locating record using table scan (ha_rnd_next)"));
 
   saved_m_curr_row = m_curr_row;
 
@@ -9397,9 +9410,9 @@ int Rows_log_event::do_table_scan_and_update(Relay_log_info const *rli) {
     int restart_count = 0;  // Number of times scanning has restarted from top
 
     if ((error = m_table->file->ha_rnd_init(true))) {
-      DBUG_PRINT("info", ("error initializing table scan"
-                          " (ha_rnd_init returns %d)",
-                          error));
+      DBUG_PRINT("custom_info", ("error initializing table scan"
+                                 " (ha_rnd_init returns %d)",
+                                 error));
       goto end;
     }
 
@@ -9407,7 +9420,7 @@ int Rows_log_event::do_table_scan_and_update(Relay_log_info const *rli) {
     do {
     restart_ha_rnd_next:
       error = m_table->file->ha_rnd_next(m_table->record[0]);
-      if (error) DBUG_PRINT("info", ("error: %s", HA_ERR(error)));
+      if (error) DBUG_PRINT("custom_info", ("error: %s", HA_ERR(error)));
       switch (error) {
         case HA_ERR_END_OF_FILE:
           // restart scan from top
@@ -9437,9 +9450,9 @@ end:
 
   /* either we report error or apply the changes */
   if (error && error != HA_ERR_RECORD_DELETED) {
-    DBUG_PRINT("info", ("Failed to get next record"
-                        " (ha_rnd_next returns %d)",
-                        error));
+    DBUG_PRINT("custom_info", ("Failed to get next record"
+                               " (ha_rnd_next returns %d)",
+                               error));
     m_table->file->print_error(error, MYF(0));
   } else
     error = do_apply_row(rli);
@@ -9574,7 +9587,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
     */
 
     {
-      DBUG_PRINT("debug",
+      DBUG_PRINT("custom_info",
                  ("Checking compability of tables to lock - tables_to_lock: %p",
                   rli->tables_to_lock));
 
@@ -9624,7 +9637,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
         if (!ptr->m_tabledef.compatible_with(thd,
                                              const_cast<Relay_log_info *>(rli),
                                              ptr->table, &conv_table)) {
-          DBUG_PRINT("debug",
+          DBUG_PRINT("custom_info",
                      ("Table: %s.%s is not compatible with master",
                       ptr->table->s->db.str, ptr->table->s->table_name.str));
           if (thd->is_slave_error) {
@@ -9637,10 +9650,10 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
             goto end;
           }
         }
-        DBUG_PRINT("debug", ("Table: %s.%s is compatible with master"
-                             " - conv_table: %p",
-                             ptr->table->s->db.str,
-                             ptr->table->s->table_name.str, conv_table));
+        DBUG_PRINT("custom_info", ("Table: %s.%s is compatible with master"
+                                   " - conv_table: %p",
+                                   ptr->table->s->db.str,
+                                   ptr->table->s->table_name.str, conv_table));
         ptr->m_conv_table = conv_table;
       }
     }
@@ -9702,7 +9715,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
   table = m_table =
       const_cast<Relay_log_info *>(rli)->m_table_map.get_table(m_table_id);
 
-  DBUG_PRINT("debug",
+  DBUG_PRINT("custom_info",
              ("m_table: %p, m_table_id: %llu", m_table, m_table_id.id()));
 
   /*
@@ -9975,7 +9988,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
 #endif
 
     do {
-      DBUG_PRINT("info", ("calling do_apply_row_ptr"));
+      DBUG_PRINT("custom_info", ("calling do_apply_row_ptr"));
 
       error = (this->*do_apply_row_ptr)(rli);
 
@@ -10212,7 +10225,8 @@ int Rows_log_event::do_update_pos(Relay_log_info *rli) {
   DBUG_TRACE;
   int error = 0;
 
-  DBUG_PRINT("info", ("flags: %s", get_flags(STMT_END_F) ? "STMT_END_F " : ""));
+  DBUG_PRINT("custom_info",
+             ("flags: %s", get_flags(STMT_END_F) ? "STMT_END_F " : ""));
 
   /* Worker does not execute binlog update position logics */
   DBUG_ASSERT(!is_mts_worker(rli->info_thd));
@@ -10438,7 +10452,7 @@ int Table_map_log_event::save_field_metadata() {
   int index = 0;
   for (auto it = this->m_fields.begin(); it != this->m_fields.end(); ++it) {
     Field *field = *it;
-    DBUG_PRINT("debug", ("field_type: %d", m_coltype[it.filtered_pos()]));
+    DBUG_PRINT("custom_info", ("field_type: %d", m_coltype[it.filtered_pos()]));
     index += field->save_field_metadata(&m_field_metadata[index]);
 
     DBUG_EXECUTE_IF("inject_invalid_blob_size", {
@@ -10699,7 +10713,7 @@ static enum_tbl_map_status check_table_map(Relay_log_info const *rli,
     }
   }
 
-  DBUG_PRINT("debug", ("check of table map ended up with: %u", res));
+  DBUG_PRINT("custom_info", ("check of table map ended up with: %u", res));
 
   return res;
 }
@@ -10744,8 +10758,9 @@ int Table_map_log_event::do_apply_event(Relay_log_info const *rli) {
       "inject_tblmap_same_id_maps_diff_table", 0, m_table_id.id());
   table_list->updating = true;
   table_list->required_type = dd::enum_table_type::BASE_TABLE;
-  DBUG_PRINT("debug", ("table: %s is mapped to %llu", table_list->table_name,
-                       table_list->table_id.id()));
+  DBUG_PRINT("custom_info",
+             ("table: %s is mapped to %llu", table_list->table_name,
+              table_list->table_id.id()));
 
   enum_tbl_map_status tblmap_status = check_table_map(rli, table_list);
   if (tblmap_status == OK_TO_PROCESS) {
@@ -11920,10 +11935,10 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
     so all the pointers shall be pointing to the same address, or else
     we have corrupt data and shall throw the error.
   */
-  DBUG_PRINT("debug", ("m_rows_buf= %p, m_rows_cur= %p, m_rows_end= %p",
-                       m_rows_buf, m_rows_cur, m_rows_end));
-  DBUG_PRINT("debug", ("m_curr_row= %p, m_curr_row_end= %p", m_curr_row,
-                       m_curr_row_end));
+  DBUG_PRINT("custom_info", ("m_rows_buf= %p, m_rows_cur= %p, m_rows_end= %p",
+                             m_rows_buf, m_rows_cur, m_rows_end));
+  DBUG_PRINT("custom_info", ("m_curr_row= %p, m_curr_row_end= %p", m_curr_row,
+                             m_curr_row_end));
   if (m_curr_row == m_curr_row_end &&
       !((m_rows_buf == m_rows_cur) && (m_rows_cur == m_rows_end))) {
     my_error(ER_SLAVE_CORRUPT_EVENT, MYF(0));
@@ -11974,7 +11989,7 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
   while ((error = table->file->ha_write_row(table->record[0]))) {
     if (error == HA_ERR_LOCK_DEADLOCK || error == HA_ERR_LOCK_WAIT_TIMEOUT ||
         (keynum = table->file->get_dup_key(error)) < 0 || !overwrite) {
-      DBUG_PRINT("info", ("get_dup_key returns %d)", keynum));
+      DBUG_PRINT("custom_info", ("get_dup_key returns %d)", keynum));
       /*
         Deadlock, waiting for lock or just an error from the handler
         such as HA_ERR_FOUND_DUPP_KEY when overwrite is false.
@@ -12009,7 +12024,8 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
          retrieve the offending row.
      */
     if (table->file->ha_table_flags() & HA_DUPLICATE_POS) {
-      DBUG_PRINT("info", ("Locating offending record using ha_rnd_pos()"));
+      DBUG_PRINT("custom_info",
+                 ("Locating offending record using ha_rnd_pos()"));
 
       if (table->file->inited && (error = table->file->ha_index_end())) {
         table->file->print_error(error, MYF(0));
@@ -12024,18 +12040,19 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
 
       table->file->ha_rnd_end();
       if (error) {
-        DBUG_PRINT("info", ("ha_rnd_pos() returns error %d", error));
+        DBUG_PRINT("custom_info", ("ha_rnd_pos() returns error %d", error));
         if (error == HA_ERR_RECORD_DELETED) error = HA_ERR_KEY_NOT_FOUND;
         table->file->print_error(error, MYF(0));
         goto error;
       }
     } else {
-      DBUG_PRINT("info", ("Locating offending record using index_read_idx()"));
+      DBUG_PRINT("custom_info",
+                 ("Locating offending record using index_read_idx()"));
 
       if (key == nullptr) {
         key = static_cast<char *>(my_alloca(table->s->max_unique_length));
         if (key == nullptr) {
-          DBUG_PRINT("info", ("Can't allocate key buffer"));
+          DBUG_PRINT("custom_info", ("Can't allocate key buffer"));
           error = ENOMEM;
           goto error;
         }
@@ -12054,7 +12071,7 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
         error = HA_ERR_FOUND_DUPP_KEY;
 
       if (error) {
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("ha_index_read_idx_map() returns %s", HA_ERR(error)));
         if (error == HA_ERR_RECORD_DELETED) error = HA_ERR_KEY_NOT_FOUND;
         table->file->print_error(error, MYF(0));
@@ -12078,7 +12095,7 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
     }
 
 #ifndef DBUG_OFF
-    DBUG_PRINT("debug", ("preparing for update: before and after image"));
+    DBUG_PRINT("custom_info", ("preparing for update: before and after image"));
     DBUG_DUMP("record[1] (before)", table->record[1], table->s->reclength);
     DBUG_DUMP("record[0] (after)", table->record[0], table->s->reclength);
 #endif
@@ -12100,28 +12117,30 @@ int Write_rows_log_event::write_row(const Relay_log_info *const rli,
      */
     if (last_uniq_key(table, keynum) &&
         !table->s->is_referenced_by_foreign_key()) {
-      DBUG_PRINT("info", ("Updating row using ha_update_row()"));
+      DBUG_PRINT("custom_info", ("Updating row using ha_update_row()"));
       error = table->file->ha_update_row(table->record[1], table->record[0]);
       switch (error) {
         case HA_ERR_RECORD_IS_THE_SAME:
-          DBUG_PRINT("info", ("ignoring HA_ERR_RECORD_IS_THE_SAME error from"
-                              " ha_update_row()"));
+          DBUG_PRINT("custom_info",
+                     ("ignoring HA_ERR_RECORD_IS_THE_SAME error from"
+                      " ha_update_row()"));
           error = 0;
 
         case 0:
           break;
 
         default:
-          DBUG_PRINT("info", ("ha_update_row() returns error %d", error));
+          DBUG_PRINT("custom_info",
+                     ("ha_update_row() returns error %d", error));
           table->file->print_error(error, MYF(0));
       }
 
       goto error;
     } else {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("Deleting offending row and trying to write new one again"));
       if ((error = table->file->ha_delete_row(table->record[1]))) {
-        DBUG_PRINT("info", ("ha_delete_row() returns error %d", error));
+        DBUG_PRINT("custom_info", ("ha_delete_row() returns error %d", error));
         table->file->print_error(error, MYF(0));
         goto error;
       }
@@ -12273,7 +12292,7 @@ binary_log::Log_event_type Update_rows_log_event::get_update_rows_event_type(
            ? binary_log::PARTIAL_UPDATE_ROWS_EVENT
            : (log_bin_use_v1_row_events ? binary_log::UPDATE_ROWS_EVENT_V1
                                         : binary_log::UPDATE_ROWS_EVENT));
-  DBUG_PRINT("info", ("update_rows event_type: %s", get_type_str(type)));
+  DBUG_PRINT("custom_info", ("update_rows event_type: %s", get_type_str(type)));
   return type;
 }
 
@@ -12288,7 +12307,7 @@ Update_rows_log_event::Update_rows_log_event(
                      get_update_rows_event_type(thd_arg), extra_row_ndb_info),
       binary_log::Update_rows_event(get_update_rows_event_type(thd_arg)) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("update_rows event_type: %s", get_type_str()));
+  DBUG_PRINT("custom_info", ("update_rows event_type: %s", get_type_str()));
   common_header->type_code = m_type;
   init(tbl_arg->write_set);
   common_header->set_is_valid(Rows_log_event::is_valid() && m_cols_ai.bitmap);
@@ -12407,7 +12426,7 @@ int Update_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
     Now we have the right row to update.  The old row (the one we're
     looking for) is in record[1] and the new row is in record[0].
   */
-  DBUG_PRINT("info", ("Updating row in table"));
+  DBUG_PRINT("custom_info", ("Updating row in table"));
   DBUG_DUMP("old record", m_table->record[1], m_table->s->reclength);
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
@@ -12443,7 +12462,7 @@ const char *Incident_log_event::description() const {
   static const char *const description[] = {"NOTHING",  // Not used
                                             "LOST_EVENTS"};
 
-  DBUG_PRINT("info", ("incident: %d", incident));
+  DBUG_PRINT("custom_info", ("incident: %d", incident));
 
   return description[incident];
 }
@@ -12484,7 +12503,7 @@ int Incident_log_event::do_apply_event(Relay_log_info const *rli) {
     'ER_SLAVE_INCIDENT' is ignored.
   */
   if (ignored_error_code(ER_SLAVE_INCIDENT)) {
-    DBUG_PRINT("info", ("Ignoring Incident"));
+    DBUG_PRINT("custom_info", ("Ignoring Incident"));
     mysql_bin_log.gtid_end_transaction(thd);
     return 0;
   }
@@ -12517,7 +12536,7 @@ int Incident_log_event::do_apply_event(Relay_log_info const *rli) {
 
 bool Incident_log_event::write_data_header(Basic_ostream *ostream) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("incident: %d", incident));
+  DBUG_PRINT("custom_info", ("incident: %d", incident));
   uchar buf[sizeof(int16)];
   int2store(buf, (int16)incident);
   return wrapper_my_b_safe_write(ostream, buf, sizeof(buf));
@@ -12680,7 +12699,7 @@ Gtid_log_event::Gtid_log_event(
           ? description_event
                 ->post_header_len[binary_log::ANONYMOUS_GTID_LOG_EVENT - 1]
           : description_event->post_header_len[binary_log::GTID_LOG_EVENT - 1];
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("event_len: %zu; common_header_len: %d; post_header_len: %d",
               header()->data_written, common_header_len, post_header_len));
 #endif
@@ -12732,7 +12751,7 @@ Gtid_log_event::Gtid_log_event(THD *thd_arg, bool using_trans,
 #ifndef DBUG_OFF
   char buf[MAX_SET_STRING_LENGTH + 1];
   to_string(buf);
-  DBUG_PRINT("info", ("%s", buf));
+  DBUG_PRINT("custom_info", ("%s", buf));
 #endif
   common_header->set_is_valid(true);
 }
@@ -12777,7 +12796,7 @@ Gtid_log_event::Gtid_log_event(
 #ifndef DBUG_OFF
   char buf[MAX_SET_STRING_LENGTH + 1];
   to_string(buf);
-  DBUG_PRINT("info", ("%s", buf));
+  DBUG_PRINT("custom_info", ("%s", buf));
 #endif
   common_header->set_is_valid(true);
 }
@@ -12890,7 +12909,7 @@ uint32 Gtid_log_event::write_post_header_to_memory(uchar *buffer) {
 #ifndef DBUG_OFF
   char buf[binary_log::Uuid::TEXT_LENGTH + 1];
   sid.to_string(buf);
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("sid=%s sidno=%d gno=%lld", buf, spec.gtid.sidno, spec.gtid.gno));
 #endif
 
@@ -13101,7 +13120,7 @@ int Gtid_log_event::do_apply_event(Relay_log_info const *rli) {
     DBUG_ASSERT(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
     DBUG_ASSERT(thd->get_transaction()->is_empty(Transaction_ctx::SESSION));
     DBUG_ASSERT(!thd->lock);
-    DBUG_PRINT("info", ("setting tx_isolation to READ COMMITTED"));
+    DBUG_PRINT("custom_info", ("setting tx_isolation to READ COMMITTED"));
     set_tx_isolation(thd, ISO_READ_COMMITTED, true /*one_shot*/);
   }
 
@@ -13257,11 +13276,11 @@ char *Previous_gtids_log_event::get_str(
   DBUG_TRACE;
   Sid_map sid_map(nullptr);
   Gtid_set set(&sid_map, nullptr);
-  DBUG_PRINT("info", ("temp_buf=%p buf=%p", temp_buf, buf));
+  DBUG_PRINT("custom_info", ("temp_buf=%p buf=%p", temp_buf, buf));
   if (set.add_gtid_encoding(buf, buf_size) != RETURN_STATUS_OK) return nullptr;
   set.dbug_print("set");
   size_t length = set.get_string_length(string_format);
-  DBUG_PRINT("info", ("string length= %lu", (ulong)length));
+  DBUG_PRINT("custom_info", ("string length= %lu", (ulong)length));
   char *str = (char *)my_malloc(key_memory_log_event, length + 1, MYF(MY_WME));
   if (str != nullptr) {
     set.to_string(str, false /*need_lock*/, string_format);
@@ -13273,7 +13292,7 @@ char *Previous_gtids_log_event::get_str(
 #ifdef MYSQL_SERVER
 bool Previous_gtids_log_event::write_data_body(Basic_ostream *ostream) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("size=%d", static_cast<int>(buf_size)));
+  DBUG_PRINT("custom_info", ("size=%d", static_cast<int>(buf_size)));
   bool ret = wrapper_my_b_safe_write(ostream, buf, buf_size);
   return ret;
 }

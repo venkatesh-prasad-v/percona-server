@@ -186,7 +186,7 @@ bool Sql_cmd_handler_open::execute(THD *thd) {
     HANDLER ... READ command, which doesn't requires any privileges.
   */
   if (thd->handler_tables_hash.count(tables->alias) != 0) {
-    DBUG_PRINT("info", ("duplicate '%s'", tables->alias));
+    DBUG_PRINT("custom_info", ("duplicate '%s'", tables->alias));
     DBUG_PRINT("exit", ("ERROR"));
     my_error(ER_NONUNIQ_TABLE, MYF(0), tables->alias);
     return true;
@@ -474,8 +474,9 @@ retry:
       }
 
       table = hash_tables->table;
-      DBUG_PRINT("info", ("re-opened '%s'.'%s' as '%s' tab %p", hash_tables->db,
-                          hash_tables->table_name, hash_tables->alias, table));
+      DBUG_PRINT("custom_info",
+                 ("re-opened '%s'.'%s' as '%s' tab %p", hash_tables->db,
+                  hash_tables->table_name, hash_tables->alias, table));
     }
   } else
     table = NULL;

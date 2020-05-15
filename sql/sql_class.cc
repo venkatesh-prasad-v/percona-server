@@ -315,9 +315,8 @@ void THD::enter_stage(const PSI_stage_info *new_stage,
                       const char *calling_func MY_ATTRIBUTE((unused)),
                       const char *calling_file,
                       const unsigned int calling_line) {
-  DBUG_PRINT("THD::enter_stage",
-             ("'%s' %s:%d", new_stage ? new_stage->m_name : "", calling_file,
-              calling_line));
+  DBUG_PRINT("custom_info", ("'%s' %s:%d", new_stage ? new_stage->m_name : "",
+                             calling_file, calling_line));
 
   if (old_stage != NULL) {
     old_stage->m_key = m_current_stage_key;
@@ -669,7 +668,7 @@ void THD::raise_warning_printf(uint sql_errno, ...) {
   va_list args;
   char ebuff[MYSQL_ERRMSG_SIZE];
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("warning: %u", sql_errno));
+  DBUG_PRINT("custom_info", ("warning: %u", sql_errno));
   const char *format = ER_THD_NONCONST(this, sql_errno);
   va_start(args, sql_errno);
   vsnprintf(ebuff, sizeof(ebuff), format, args);
@@ -679,7 +678,7 @@ void THD::raise_warning_printf(uint sql_errno, ...) {
 
 void THD::raise_note(uint sql_errno) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("code: %d", sql_errno));
+  DBUG_PRINT("custom_info", ("code: %d", sql_errno));
   if (!(variables.option_bits & OPTION_SQL_NOTES)) return;
   const char *msg = ER_THD_NONCONST(this, sql_errno);
   (void)raise_condition(sql_errno, NULL, Sql_condition::SL_NOTE, msg);
@@ -689,7 +688,7 @@ void THD::raise_note_printf(uint sql_errno, ...) {
   va_list args;
   char ebuff[MYSQL_ERRMSG_SIZE];
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("code: %u", sql_errno));
+  DBUG_PRINT("custom_info", ("code: %u", sql_errno));
   if (!(variables.option_bits & OPTION_SQL_NOTES)) return;
   const char *format = ER_THD_NONCONST(this, sql_errno);
   va_start(args, sql_errno);
@@ -1208,7 +1207,7 @@ extern "C" int thd_is_background_thread(const THD *thd) {
 
 void THD::awake(THD::killed_state state_to_set) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("this: %p current_thd: %p", this, current_thd));
+  DBUG_PRINT("custom_info", ("this: %p current_thd: %p", this, current_thd));
   THD_CHECK_SENTRY(this);
   mysql_mutex_assert_owner(&LOCK_thd_data);
 

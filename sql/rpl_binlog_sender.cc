@@ -151,8 +151,8 @@ void Binlog_sender::init() {
   /* Initialize the buffer only once. */
   m_packet.mem_realloc(PACKET_MIN_SIZE);  // size of the buffer
   m_new_shrink_size = PACKET_MIN_SIZE;
-  DBUG_PRINT("info", ("Initial packet->alloced_length: %zu",
-                      m_packet.alloced_length()));
+  DBUG_PRINT("custom_info", ("Initial packet->alloced_length: %zu",
+                             m_packet.alloced_length()));
 
   if (!mysql_bin_log.is_open()) {
     set_fatal_error("Binary log is not open");
@@ -429,9 +429,11 @@ int Binlog_sender::get_binlog_end_pos(File_reader *reader, my_off_t *end_pos) {
       return 0;
     }
 
-    DBUG_PRINT("info", ("Reading file %s, seek pos %llu, end_pos is %llu",
-                        m_linfo.log_file_name, read_pos, *end_pos));
-    DBUG_PRINT("info", ("Active file is %s", mysql_bin_log.get_log_fname()));
+    DBUG_PRINT("custom_info",
+               ("Reading file %s, seek pos %llu, end_pos is %llu",
+                m_linfo.log_file_name, read_pos, *end_pos));
+    DBUG_PRINT("custom_info",
+               ("Active file is %s", mysql_bin_log.get_log_fname()));
 
     if (read_pos < *end_pos) return 0;
 
@@ -514,8 +516,8 @@ int Binlog_sender::send_events(File_reader *reader, my_off_t end_pos) {
       } else {
         exclude_group_end_pos = log_pos;
       }
-      DBUG_PRINT("info", ("Event of type %s is skipped",
-                          Log_event::get_type_str(event_type)));
+      DBUG_PRINT("custom_info", ("Event of type %s is skipped",
+                                 Log_event::get_type_str(event_type)));
     } else {
       /*
         A heartbeat is required before sending a event, If some events are
@@ -930,8 +932,8 @@ inline void Binlog_sender::calc_event_checksum(uchar *event_ptr,
 inline int Binlog_sender::reset_transmit_packet(ushort flags,
                                                 size_t event_len) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("event_len: %zu, m_packet->alloced_length: %zu",
-                      event_len, m_packet.alloced_length()));
+  DBUG_PRINT("custom_info", ("event_len: %zu, m_packet->alloced_length: %zu",
+                             event_len, m_packet.alloced_length()));
   DBUG_ASSERT(m_packet.alloced_length() >= PACKET_MIN_SIZE);
 
   m_packet.length(0);          // size of the content
@@ -947,9 +949,9 @@ inline int Binlog_sender::reset_transmit_packet(ushort flags,
   /* Resizes the buffer if needed. */
   if (event_len > 0 && grow_packet(event_len)) return 1;
 
-  DBUG_PRINT("info", ("m_packet.alloced_length: %zu (after potential "
-                      "reallocation)",
-                      m_packet.alloced_length()));
+  DBUG_PRINT("custom_info", ("m_packet.alloced_length: %zu (after potential "
+                             "reallocation)",
+                             m_packet.alloced_length()));
 
   return 0;
 }
@@ -1162,8 +1164,9 @@ inline int Binlog_sender::read_event(File_reader *reader, uchar **event_ptr,
   DBUG_ASSERT(reinterpret_cast<char *>(*event_ptr) ==
               (m_packet.ptr() + event_offset));
 
-  DBUG_PRINT("info", ("Read event %s", Log_event::get_type_str(Log_event_type(
-                                           (*event_ptr)[EVENT_TYPE_OFFSET]))));
+  DBUG_PRINT("custom_info",
+             ("Read event %s", Log_event::get_type_str(Log_event_type(
+                                   (*event_ptr)[EVENT_TYPE_OFFSET]))));
 #ifndef DBUG_OFF
   if (!readahead && check_event_count()) return 1;
 #endif
@@ -1178,7 +1181,7 @@ int Binlog_sender::send_heartbeat_event(my_off_t log_pos) {
   size_t event_len = ident_len + LOG_EVENT_HEADER_LEN +
                      (event_checksum_on() ? BINLOG_CHECKSUM_LEN : 0);
 
-  DBUG_PRINT("info", ("log_file_name %s, log_pos %llu", p, log_pos));
+  DBUG_PRINT("custom_info", ("log_file_name %s, log_pos %llu", p, log_pos));
 
   if (reset_transmit_packet(0, event_len)) return 1;
 
@@ -1211,7 +1214,7 @@ inline int Binlog_sender::flush_net() {
 
 inline int Binlog_sender::send_packet() {
   DBUG_TRACE;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("Sending event of type %s",
               Log_event::get_type_str(
                   (Log_event_type)m_packet.ptr()[1 + EVENT_TYPE_OFFSET])));

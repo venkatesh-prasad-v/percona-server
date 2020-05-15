@@ -752,7 +752,8 @@ int ha_finalize_handlerton(st_plugin_int *plugin) {
       Today we have no defined/special behavior for uninstalling
       engine plugins.
     */
-    DBUG_PRINT("info", ("Deinitializing plugin: '%s'", plugin->name.str));
+    DBUG_PRINT("custom_info",
+               ("Deinitializing plugin: '%s'", plugin->name.str));
     if (plugin->plugin->deinit(NULL)) {
       DBUG_PRINT("warning", ("Plugin '%s' deinit function returned error.",
                              plugin->name.str));
@@ -803,7 +804,7 @@ int ha_initialize_handlerton(st_plugin_int *plugin) {
     the switch below and hton->state should be removed when
     command-line options for plugins will be implemented
   */
-  DBUG_PRINT("info", ("hton->state=%d", hton->state));
+  DBUG_PRINT("custom_info", ("hton->state=%d", hton->state));
   switch (hton->state) {
     case SHOW_OPTION_NO:
       break;
@@ -1317,7 +1318,7 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
     thd->server_status |= SERVER_STATUS_IN_TRANS;
     if (thd->tx_read_only)
       thd->server_status |= SERVER_STATUS_IN_TRANS_READONLY;
-    DBUG_PRINT("info", ("setting SERVER_STATUS_IN_TRANS"));
+    DBUG_PRINT("custom_info", ("setting SERVER_STATUS_IN_TRANS"));
   }
 
   ha_info = thd->get_ha_data(ht_arg->slot)->ha_info + (all ? 1 : 0);
@@ -1647,8 +1648,9 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
 
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("all=%d thd->in_sub_stmt=%d ha_info=%p is_real_trans=%d",
-                      all, thd->in_sub_stmt, ha_info, is_real_trans));
+  DBUG_PRINT("custom_info",
+             ("all=%d thd->in_sub_stmt=%d ha_info=%p is_real_trans=%d", all,
+              thd->in_sub_stmt, ha_info, is_real_trans));
   /*
     We must not commit the normal transaction if a statement
     transaction is pending. Otherwise statement transaction
@@ -1747,7 +1749,7 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
       MDL_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "",
                        MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
 
-      DBUG_PRINT("debug", ("Acquire MDL commit lock"));
+      DBUG_PRINT("custom_info", ("Acquire MDL commit lock"));
       if (thd->mdl_context.acquire_lock(&mdl_request,
                                         thd->variables.lock_wait_timeout)) {
         ha_rollback_trans(thd, all);
@@ -1807,7 +1809,7 @@ end:
       thus we release the commit blocker lock as soon as it's
       not needed.
     */
-    DBUG_PRINT("debug", ("Releasing MDL commit lock"));
+    DBUG_PRINT("custom_info", ("Releasing MDL commit lock"));
     thd->mdl_context.release_lock(mdl_request.ticket);
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
@@ -1898,7 +1900,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
       reattaches the engine ha_data to THD, previously saved at XA START.
     */
     if (all && thd->rpl_unflag_detached_engine_ha_data()) {
-      DBUG_PRINT("info", ("query='%s'", thd->query().str));
+      DBUG_PRINT("custom_info", ("query='%s'", thd->query().str));
       DBUG_ASSERT(thd->lex->sql_command == SQLCOM_XA_COMMIT);
       DBUG_ASSERT(
           static_cast<Sql_cmd_xa_commit *>(thd->lex->m_sql_cmd)->get_xa_opt() ==
@@ -2953,7 +2955,8 @@ int handler::ha_open(TABLE *table_arg, const char *name, int mode,
   table = table_arg;
   DBUG_ASSERT(table->s == table_share);
   DBUG_ASSERT(m_lock_type == F_UNLCK);
-  DBUG_PRINT("info", ("old m_lock_type: %d F_UNLCK %d", m_lock_type, F_UNLCK));
+  DBUG_PRINT("custom_info",
+             ("old m_lock_type: %d F_UNLCK %d", m_lock_type, F_UNLCK));
   MEM_ROOT *mem_root = (test_if_locked & HA_OPEN_TMP_TABLE)
                            ? &table->s->mem_root
                            : &table->mem_root;
@@ -3856,9 +3859,9 @@ inline ulonglong prev_insert_id(ulonglong nr,
       the offset is larger than the column's max possible value, i.e. not even
       the first sequence value may be inserted. User will receive warning.
     */
-    DBUG_PRINT("info", ("auto_increment: nr: %lu cannot honour "
-                        "auto_increment_offset: %lu",
-                        (ulong)nr, variables->auto_increment_offset));
+    DBUG_PRINT("custom_info", ("auto_increment: nr: %lu cannot honour "
+                               "auto_increment_offset: %lu",
+                               (ulong)nr, variables->auto_increment_offset));
     return nr;
   }
   if (variables->auto_increment_increment == 1)
@@ -4082,13 +4085,13 @@ int handler::update_auto_increment() {
         thd->auto_inc_interval_for_cur_row, so we are sure to call the engine
         for next row.
       */
-      DBUG_PRINT("info", ("auto_increment: special not-first-in-index"));
+      DBUG_PRINT("custom_info", ("auto_increment: special not-first-in-index"));
     }
   }
 
   if (unlikely(nr == ULLONG_MAX)) return HA_ERR_AUTOINC_ERANGE;
 
-  DBUG_PRINT("info", ("auto_increment: %lu", (ulong)nr));
+  DBUG_PRINT("custom_info", ("auto_increment: %lu", (ulong)nr));
 
   if (unlikely(table->next_number_field->store((longlong)nr, true))) {
     /*
@@ -4154,8 +4157,8 @@ int handler::update_auto_increment() {
 */
 void handler::column_bitmaps_signal() {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("read_set: %p  write_set: %p", table->read_set,
-                      table->write_set));
+  DBUG_PRINT("custom_info", ("read_set: %p  write_set: %p", table->read_set,
+                             table->write_set));
 }
 
 /**
@@ -7166,13 +7169,13 @@ ha_rows DsMrr_impl::dsmrr_info(uint keyno, uint n_ranges, uint rows,
   if ((*flags & HA_MRR_USE_DEFAULT_IMPL) ||
       choose_mrr_impl(keyno, rows, flags, bufsz, cost)) {
     /* Default implementation is choosen */
-    DBUG_PRINT("info", ("Default MRR implementation choosen"));
+    DBUG_PRINT("custom_info", ("Default MRR implementation choosen"));
     *flags = def_flags;
     *bufsz = def_bufsz;
     DBUG_ASSERT(*flags & HA_MRR_USE_DEFAULT_IMPL);
   } else {
     /* *flags and *bufsz were set by choose_mrr_impl */
-    DBUG_PRINT("info", ("DS-MRR implementation choosen"));
+    DBUG_PRINT("custom_info", ("DS-MRR implementation choosen"));
   }
   return 0;
 }
@@ -7204,13 +7207,13 @@ ha_rows DsMrr_impl::dsmrr_info_const(uint keyno, RANGE_SEQ_IF *seq,
   */
   if ((*flags & HA_MRR_USE_DEFAULT_IMPL) ||
       choose_mrr_impl(keyno, rows, flags, bufsz, cost)) {
-    DBUG_PRINT("info", ("Default MRR implementation choosen"));
+    DBUG_PRINT("custom_info", ("Default MRR implementation choosen"));
     *flags = def_flags;
     *bufsz = def_bufsz;
     DBUG_ASSERT(*flags & HA_MRR_USE_DEFAULT_IMPL);
   } else {
     /* *flags and *bufsz were set by choose_mrr_impl */
-    DBUG_PRINT("info", ("DS-MRR implementation choosen"));
+    DBUG_PRINT("custom_info", ("DS-MRR implementation choosen"));
   }
   return rows;
 }
@@ -7525,7 +7528,7 @@ void get_sweep_read_cost(TABLE *table, ha_rows nrows, bool interrupted,
         n_blocks * (1.0 - pow(1.0 - 1.0 / n_blocks, rows2double(nrows)));
     if (busy_blocks < 1.0) busy_blocks = 1.0;
 
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("sweep: nblocks=%g, busy_blocks=%g", n_blocks, busy_blocks));
     /*
       The random access cost for reading the data pages will be the upper
@@ -7569,7 +7572,7 @@ void get_sweep_read_cost(TABLE *table, ha_rows nrows, bool interrupted,
       if (sweep_cost < *cost) *cost = sweep_cost;
     }
   }
-  DBUG_PRINT("info", ("returning cost=%g", cost->total_cost()));
+  DBUG_PRINT("custom_info", ("returning cost=%g", cost->total_cost()));
 }
 
 /****************************************************************************
@@ -8062,7 +8065,7 @@ static int write_locked_table_maps(THD *thd) {
                        "thd->extra_lock: %p",
                        thd, thd->lock, thd->extra_lock));
 
-  DBUG_PRINT("debug",
+  DBUG_PRINT("custom_info",
              ("get_binlog_table_maps(): %d", thd->get_binlog_table_maps()));
 
   if (thd->get_binlog_table_maps() == 0) {
@@ -8073,7 +8076,8 @@ static int write_locked_table_maps(THD *thd) {
       TABLE **const end_ptr = lock->table + lock->table_count;
       for (TABLE **table_ptr = lock->table; table_ptr != end_ptr; ++table_ptr) {
         TABLE *const table = *table_ptr;
-        DBUG_PRINT("info", ("Checking table %s", table->s->table_name.str));
+        DBUG_PRINT("custom_info",
+                   ("Checking table %s", table->s->table_name.str));
         if (table->current_lock == F_WRLCK &&
             check_table_binlog_row_based(thd, table)) {
           /*
@@ -8230,8 +8234,7 @@ int handler::ha_write_row(uchar *buf) {
 
   DBUG_TRACE;
   DEBUG_SYNC(ha_thd(), "start_ha_write_row");
-  DBUG_EXECUTE_IF("inject_error_ha_write_row",
-                  return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
   mark_trx_read_write();

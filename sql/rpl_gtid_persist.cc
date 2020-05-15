@@ -296,16 +296,16 @@ int Gtid_table_persistor::update_row(TABLE *table, const char *sid,
 
   if ((error = table->file->ha_index_init(0, true))) {
     table->file->print_error(error, MYF(0));
-    DBUG_PRINT("info", ("ha_index_init error"));
+    DBUG_PRINT("custom_info", ("ha_index_init error"));
     goto end;
   }
 
   if ((error = table->file->ha_index_read_map(
            table->record[0], user_key, HA_WHOLE_KEY, HA_READ_KEY_EXACT))) {
-    DBUG_PRINT("info", ("Row not found"));
+    DBUG_PRINT("custom_info", ("Row not found"));
     goto end;
   } else {
-    DBUG_PRINT("info", ("Row found"));
+    DBUG_PRINT("custom_info", ("Row found"));
     store_record(table, record[1]);
   }
 
@@ -356,6 +356,7 @@ int Gtid_table_persistor::save(THD *thd, const Gtid *gtid) {
 
   /* Save the gtid info into table. */
   error = write_row(table, buf, gtid->gno, gtid->gno);
+  DBUG_PRINT("custom_info", ("Gtid_table_persistor::save1 - gtid inserted"));
 
 end:
   if (table_access_ctx.deinit(thd, table, 0 != error, false)) error = -1;
@@ -367,6 +368,9 @@ end:
         DBUG_EVALUATE_IF("compress_gtid_table", 1, 0)) {
       mysql_mutex_lock(&LOCK_compress_gtid_table);
       should_compress = true;
+      DBUG_PRINT(
+          "custom_info",
+          ("Gtid_table_persistor::save1 - signaling the compression thread"));
       mysql_cond_signal(&COND_compress_gtid_table);
       mysql_mutex_unlock(&LOCK_compress_gtid_table);
     }
@@ -407,6 +411,9 @@ end:
       DBUG_EVALUATE_IF("dont_compress_gtid_table", 0, 1)) {
     mysql_mutex_lock(&LOCK_compress_gtid_table);
     should_compress = true;
+    DBUG_PRINT(
+        "custom_info",
+        ("Gtid_table_persistor::save2 - signaling the compression thread"));
     mysql_cond_signal(&COND_compress_gtid_table);
     mysql_mutex_unlock(&LOCK_compress_gtid_table);
   }
@@ -481,6 +488,8 @@ int Gtid_table_persistor::compress(THD *thd) {
   DBUG_TRACE;
   int error = 0;
   bool is_complete = false;
+  DBUG_PRINT("custom_info",
+             ("Gtid_table_persistor::compress - compressing the table"));
 
   while (!is_complete && !error)
     error = compress_in_single_transaction(thd, is_complete);
@@ -754,14 +763,25 @@ static void *compress_gtid_table(void *p_thd) {
       replication repository tables.
     */
     thd->set_skip_readonly_check();
+    DBUG_PRINT("custom_info",
+               ("compress_gtid_table - compression thread started."));
+
+    // Compress the table at server startup
+    should_compress = true;
+
     for (;;) {
       mysql_mutex_lock(&LOCK_compress_gtid_table);
       if (terminate_compress_thread) break;
       THD_ENTER_COND(thd, &COND_compress_gtid_table, &LOCK_compress_gtid_table,
                      &stage_suspending, nullptr);
       /* Add the check to handle spurious wakeups from system. */
-      while (!(should_compress || terminate_compress_thread))
+      while (!(should_compress || terminate_compress_thread)) {
+        DBUG_PRINT("custom_info",
+                   ("compress_gtid_table - thread entering wait."));
         mysql_cond_wait(&COND_compress_gtid_table, &LOCK_compress_gtid_table);
+        DBUG_PRINT("custom_info",
+                   ("compress_gtid_table - thread woken up by signal."));
+      }
       should_compress = false;
       if (terminate_compress_thread) break;
       mysql_mutex_unlock(&LOCK_compress_gtid_table);
@@ -841,6 +861,8 @@ void terminate_compress_gtid_table_thread() {
   /* Notify suspended compression thread. */
   mysql_mutex_lock(&LOCK_compress_gtid_table);
   terminate_compress_thread = true;
+  DBUG_PRINT("custom_info",
+             ("terminate_compress_gtid_table_thread - Terminating."));
   mysql_cond_signal(&COND_compress_gtid_table);
   mysql_mutex_unlock(&LOCK_compress_gtid_table);
 

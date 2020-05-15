@@ -121,10 +121,10 @@ int Mts_submode_database::wait_for_workers_to_finish(Relay_log_info *rli,
   DBUG_TRACE;
 
   llstr(rli->get_event_relay_log_pos(), llbuf);
-  DBUG_PRINT("info", ("Coordinator and workers enter synchronization "
-                      "procedure when scheduling event relay-log: %s "
-                      "pos: %s",
-                      rli->get_event_relay_log_name(), llbuf));
+  DBUG_PRINT("custom_info", ("Coordinator and workers enter synchronization "
+                             "procedure when scheduling event relay-log: %s "
+                             "pos: %s",
+                             rli->get_event_relay_log_name(), llbuf));
 
   mysql_mutex_lock(&rli->slave_worker_hash_lock);
 
@@ -148,9 +148,9 @@ int Mts_submode_database::wait_for_workers_to_finish(Relay_log_info *rli,
       do {
         mysql_cond_wait(&rli->slave_worker_hash_cond,
                         &rli->slave_worker_hash_lock);
-        DBUG_PRINT("info", ("Either got awakened of notified: "
-                            "entry %p, usage %lu, worker %lu",
-                            entry, entry->usage, w_entry->id));
+        DBUG_PRINT("custom_info", ("Either got awakened of notified: "
+                                   "entry %p, usage %lu, worker %lu",
+                                   entry, entry->usage, w_entry->id));
       } while (entry->usage != 0 && !thd->killed);
       entry->worker =
           w_entry;  // restoring last association, needed only for assert
@@ -171,9 +171,9 @@ int Mts_submode_database::wait_for_workers_to_finish(Relay_log_info *rli,
   mysql_mutex_unlock(&rli->slave_worker_hash_lock);
 
   if (!ignore) {
-    DBUG_PRINT("info", ("Coordinator synchronized with workers, "
-                        "waited entries: %d, cant_sync: %d",
-                        ret, cant_sync));
+    DBUG_PRINT("custom_info", ("Coordinator synchronized with workers, "
+                               "waited entries: %d, cant_sync: %d",
+                               ret, cant_sync));
 
     rli->mts_group_status = Relay_log_info::MTS_NOT_IN_GROUP;
   }
@@ -525,8 +525,8 @@ int Mts_submode_logical_clock::schedule_next_event(Relay_log_info *rli,
       break;
   }
 
-  DBUG_PRINT("info", ("sequence_number %lld, last_committed %lld",
-                      sequence_number, last_committed));
+  DBUG_PRINT("custom_info", ("sequence_number %lld, last_committed %lld",
+                             sequence_number, last_committed));
 
   if (first_event) {
     first_event = false;
@@ -557,9 +557,10 @@ int Mts_submode_logical_clock::schedule_next_event(Relay_log_info *rli,
         TODO: account autopositioning
         DBUG_ASSERT(rli->replicate_same_server_id);
       */
-      DBUG_PRINT("info", ("sequence_number gap found, "
-                          "last_sequence_number %lld, sequence_number %lld",
-                          last_sequence_number, sequence_number));
+      DBUG_PRINT("custom_info",
+                 ("sequence_number gap found, "
+                  "last_sequence_number %lld, sequence_number %lld",
+                  last_sequence_number, sequence_number));
       gap_successor = true;
     }
   }
@@ -894,7 +895,8 @@ int Mts_submode_logical_clock::wait_for_workers_to_finish(
   PSI_stage_info *old_stage = nullptr;
   THD *thd = rli->info_thd;
   DBUG_TRACE;
-  DBUG_PRINT("info", ("delegated %d, jobs_done %d", delegated_jobs, jobs_done));
+  DBUG_PRINT("custom_info",
+             ("delegated %d, jobs_done %d", delegated_jobs, jobs_done));
   // Update thd info as waiting for workers to finish.
   thd->enter_stage(&stage_slave_waiting_for_workers_to_process_queue, old_stage,
                    __func__, __FILE__, __LINE__);
@@ -920,9 +922,10 @@ int Mts_submode_logical_clock::wait_for_workers_to_finish(
   rli->gaq->lwm.sequence_number = SEQ_UNINIT;
   // Restore previous info.
   THD_STAGE_INFO(thd, *old_stage);
-  DBUG_PRINT("info", ("delegated %d, jobs_done %d, Workers have finished their"
-                      " jobs",
-                      delegated_jobs, jobs_done));
+  DBUG_PRINT("custom_info",
+             ("delegated %d, jobs_done %d, Workers have finished their"
+              " jobs",
+              delegated_jobs, jobs_done));
   rli->mts_group_status = Relay_log_info::MTS_NOT_IN_GROUP;
   return !thd->killed && !is_error ? 0 : -1;
 }

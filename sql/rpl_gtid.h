@@ -455,7 +455,7 @@ class Checkable_rwlock {
     mysql_rwlock_rdlock(&rwlock);
     assert_no_wrlock();
 #ifndef DBUG_OFF
-    if (dbug_trace) DBUG_PRINT("info", ("%p.rdlock()", this));
+    if (dbug_trace) DBUG_PRINT("custom_info", ("%p.rdlock()", this));
     ++lock_state;
 #endif
   }
@@ -464,7 +464,7 @@ class Checkable_rwlock {
     mysql_rwlock_wrlock(&rwlock);
     assert_no_lock();
 #ifndef DBUG_OFF
-    if (dbug_trace) DBUG_PRINT("info", ("%p.wrlock()", this));
+    if (dbug_trace) DBUG_PRINT("custom_info", ("%p.wrlock()", this));
     lock_state.store(-1);
 #else
     is_write_lock = true;
@@ -474,7 +474,7 @@ class Checkable_rwlock {
   inline void unlock() {
     assert_some_lock();
 #ifndef DBUG_OFF
-    if (dbug_trace) DBUG_PRINT("info", ("%p.unlock()", this));
+    if (dbug_trace) DBUG_PRINT("custom_info", ("%p.unlock()", this));
     int val = lock_state.load();
     if (val > 0)
       --lock_state;
@@ -509,7 +509,7 @@ class Checkable_rwlock {
     if (ret == 0) {
       assert_no_lock();
 #ifndef DBUG_OFF
-      if (dbug_trace) DBUG_PRINT("info", ("%p.wrlock()", this));
+      if (dbug_trace) DBUG_PRINT("custom_info", ("%p.wrlock()", this));
       lock_state.store(-1);
 #else
       is_write_lock = true;
@@ -1010,7 +1010,7 @@ struct Gtid {
 #ifndef DBUG_OFF
     char buf[MAX_TEXT_LENGTH + 1];
     to_string(sid_map, buf, need_lock);
-    DBUG_PRINT("info", ("%s%s%s", text, *text ? ": " : "", buf));
+    DBUG_PRINT("custom_info", ("%s%s%s", text, *text ? ": " : "", buf));
 #endif
   }
 };
@@ -1704,8 +1704,9 @@ class Gtid_set {
 #ifndef DBUG_OFF
     char *str;
     to_string(&str, need_lock, sf);
-    DBUG_PRINT("info", ("%s%s'%s'", text, *text ? ": " : "",
-                        str ? str : "out of memory in Gtid_set::dbug_print"));
+    DBUG_PRINT("custom_info",
+               ("%s%s'%s'", text, *text ? ": " : "",
+                str ? str : "out of memory in Gtid_set::dbug_print"));
     my_free(str);
 #endif
   }
@@ -2410,7 +2411,7 @@ class Owned_gtids {
   void dbug_print(const char *text MY_ATTRIBUTE((unused)) = "") const {
 #ifndef DBUG_OFF
     char *str = to_string();
-    DBUG_PRINT("info", ("%s%s%s", text, *text ? ": " : "", str));
+    DBUG_PRINT("custom_info", ("%s%s%s", text, *text ? ": " : "", str));
     my_free(str);
 #endif
   }
@@ -2687,7 +2688,7 @@ class Gtid_state {
     int32 new_value =
 #endif
         ++atomic_anonymous_gtid_count;
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("atomic_anonymous_gtid_count increased to %d", new_value));
     DBUG_ASSERT(new_value >= 1);
     return;
@@ -2702,7 +2703,7 @@ class Gtid_state {
     int32 new_value =
 #endif
         --atomic_anonymous_gtid_count;
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("atomic_anonymous_gtid_count decreased to %d", new_value));
     DBUG_ASSERT(new_value >= 0);
     return;
@@ -2773,8 +2774,9 @@ class Gtid_state {
     int32 new_value =
 #endif
         ++atomic_anonymous_gtid_violation_count;
-    DBUG_PRINT("info", ("atomic_anonymous_gtid_violation_count increased to %d",
-                        new_value));
+    DBUG_PRINT(
+        "custom_info",
+        ("atomic_anonymous_gtid_violation_count increased to %d", new_value));
     DBUG_ASSERT(new_value >= 1);
     return;
   }
@@ -2823,8 +2825,8 @@ class Gtid_state {
     int32 new_value =
 #endif
         ++atomic_gtid_wait_count;
-    DBUG_PRINT("info", ("atomic_gtid_wait_count changed from %d to %d",
-                        new_value - 1, new_value));
+    DBUG_PRINT("custom_info", ("atomic_gtid_wait_count changed from %d to %d",
+                               new_value - 1, new_value));
     DBUG_ASSERT(new_value >= 1);
     return;
   }
@@ -2840,8 +2842,8 @@ class Gtid_state {
     int32 new_value =
 #endif
         --atomic_gtid_wait_count;
-    DBUG_PRINT("info", ("atomic_gtid_wait_count changed from %d to %d",
-                        new_value + 1, new_value));
+    DBUG_PRINT("custom_info", ("atomic_gtid_wait_count changed from %d to %d",
+                               new_value + 1, new_value));
     DBUG_ASSERT(new_value >= 0);
     return;
   }
@@ -3103,7 +3105,7 @@ class Gtid_state {
 #ifndef DBUG_OFF
     sid_lock->assert_some_wrlock();
     char *str = to_string();
-    DBUG_PRINT("info", ("%s%s%s", text, *text ? ": " : "", str));
+    DBUG_PRINT("custom_info", ("%s%s%s", text, *text ? ": " : "", str));
     my_free(str);
 #endif
   }
@@ -3714,7 +3716,7 @@ struct Gtid_specification {
 #ifndef DBUG_OFF
     char buf[MAX_TEXT_LENGTH + 1];
     to_string(global_sid_map, buf, need_lock);
-    DBUG_PRINT("info", ("%s%s%s", text, *text ? ": " : "", buf));
+    DBUG_PRINT("custom_info", ("%s%s%s", text, *text ? ": " : "", buf));
 #endif
   }
 };

@@ -325,11 +325,11 @@ bool is_already_logged_transaction(const THD *thd) {
 static inline void skip_statement(const THD *thd MY_ATTRIBUTE((unused))) {
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("skipping statement '%s'. "
-                      "gtid_next->type=%d sql_command=%d "
-                      "thd->thread_id=%u",
-                      thd->query().str, thd->variables.gtid_next.type,
-                      thd->lex->sql_command, thd->thread_id()));
+  DBUG_PRINT("custom_info", ("skipping statement '%s'. "
+                             "gtid_next->type=%d sql_command=%d "
+                             "thd->thread_id=%u",
+                             thd->query().str, thd->variables.gtid_next.type,
+                             thd->lex->sql_command, thd->thread_id()));
 
 #ifndef DBUG_OFF
   const Gtid_set *executed_gtids = gtid_state->get_executed_gtids();
@@ -352,13 +352,13 @@ bool gtid_reacquire_ownership_if_anonymous(THD *thd) {
     Gtid_log_event to set the GTID appropriately, but if there is no
     Gtid_log_event, gtid_next will be converted to ANONYMOUS.
   */
-  DBUG_PRINT("info", ("gtid_next->type=%d gtid_mode=%s", gtid_next->type,
-                      get_gtid_mode_string(GTID_MODE_LOCK_NONE)));
+  DBUG_PRINT("custom_info", ("gtid_next->type=%d gtid_mode=%s", gtid_next->type,
+                             get_gtid_mode_string(GTID_MODE_LOCK_NONE)));
   if (gtid_next->type == NOT_YET_DETERMINED_GTID ||
       (gtid_next->type == ANONYMOUS_GTID && thd->owned_gtid.sidno == 0)) {
     Gtid_specification spec;
     spec.set_anonymous();
-    DBUG_PRINT("info", ("acquiring ANONYMOUS ownership"));
+    DBUG_PRINT("custom_info", ("acquiring ANONYMOUS ownership"));
 
     global_sid_lock->rdlock();
     // set_gtid_next releases global_sid_lock
@@ -424,7 +424,7 @@ enum_gtid_statement_status gtid_pre_statement_checks(THD *thd) {
 
   Gtid_specification *gtid_next = &thd->variables.gtid_next;
 
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("gtid_next->type=%d "
               "owned_gtid.{sidno,gno}={%d,%lld}",
               gtid_next->type, thd->owned_gtid.sidno, thd->owned_gtid.gno));
@@ -488,11 +488,12 @@ enum_gtid_statement_status gtid_pre_statement_checks(THD *thd) {
 
   const Gtid_set *gtid_next_list = thd->get_gtid_next_list_const();
 
-  DBUG_PRINT("info", ("gtid_next_list=%p gtid_next->type=%d "
-                      "thd->owned_gtid.gtid.{sidno,gno}={%d,%lld} "
-                      "thd->thread_id=%u",
-                      gtid_next_list, gtid_next->type, thd->owned_gtid.sidno,
-                      thd->owned_gtid.gno, thd->thread_id()));
+  DBUG_PRINT("custom_info",
+             ("gtid_next_list=%p gtid_next->type=%d "
+              "thd->owned_gtid.gtid.{sidno,gno}={%d,%lld} "
+              "thd->thread_id=%u",
+              gtid_next_list, gtid_next->type, thd->owned_gtid.sidno,
+              thd->owned_gtid.gno, thd->thread_id()));
 
   const bool skip_transaction = is_already_logged_transaction(thd);
   if (gtid_next_list == nullptr) {

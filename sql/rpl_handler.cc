@@ -533,7 +533,7 @@ int Trans_delegate::after_commit(THD *thd, bool all) {
   param.server_id = thd->server_id;
   param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
 
-  DBUG_PRINT("enter",
+  DBUG_PRINT("custom_info",
              ("log_file: %s, log_pos: %llu", param.log_file, param.log_pos));
   DEBUG_SYNC(thd, "before_call_after_commit_observer");
 
@@ -582,7 +582,7 @@ int Trans_delegate::trans_begin(THD *thd, int &out) {
 int Binlog_storage_delegate::after_flush(THD *thd, const char *log_file,
                                          my_off_t log_pos) {
   DBUG_TRACE;
-  DBUG_PRINT("enter",
+  DBUG_PRINT("custom_info",
              ("log_file: %s, log_pos: %llu", log_file, (ulonglong)log_pos));
   Binlog_storage_param param;
   param.server_id = thd->server_id;
@@ -699,7 +699,7 @@ int Server_state_delegate::after_dd_upgrade_from_57(THD *) {
 int Binlog_storage_delegate::after_sync(THD *thd, const char *log_file,
                                         my_off_t log_pos) {
   DBUG_TRACE;
-  DBUG_PRINT("enter",
+  DBUG_PRINT("custom_info",
              ("log_file: %s, log_pos: %llu", log_file, (ulonglong)log_pos));
   Binlog_storage_param param;
   param.server_id = thd->server_id;

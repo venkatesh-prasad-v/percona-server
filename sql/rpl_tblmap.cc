@@ -67,16 +67,16 @@ table_mapping::~table_mapping() {
 
 Mapped_table *table_mapping::get_table(ulonglong table_id) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("table_id: %llu", table_id));
+  DBUG_PRINT("custom_info", ("table_id: %llu", table_id));
   auto it = m_table_ids.find(table_id);
   if (it != m_table_ids.end()) {
     entry *e = it->second;
-    DBUG_PRINT("info", ("tid %llu -> table %p (%s)", table_id, e->table,
-                        MAYBE_TABLE_NAME(e->table)));
+    DBUG_PRINT("custom_info", ("tid %llu -> table %p (%s)", table_id, e->table,
+                               MAYBE_TABLE_NAME(e->table)));
     return e->table;
   }
 
-  DBUG_PRINT("info", ("tid %llu is not mapped!", table_id));
+  DBUG_PRINT("custom_info", ("tid %llu is not mapped!", table_id));
   return nullptr;
 }
 
@@ -99,8 +99,8 @@ int table_mapping::expand() {
 
 int table_mapping::set_table(ulonglong table_id, Mapped_table *table) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("table_id: %llu  table: %p (%s)", table_id, table,
-                       MAYBE_TABLE_NAME(table)));
+  DBUG_PRINT("custom_info", ("table_id: %llu  table: %p (%s)", table_id, table,
+                             MAYBE_TABLE_NAME(table)));
   entry *e;
   auto it = m_table_ids.find(table_id);
   if (it == m_table_ids.end()) {
@@ -119,8 +119,8 @@ int table_mapping::set_table(ulonglong table_id, Mapped_table *table) {
   e->table = table;
   m_table_ids.emplace(table_id, e);
 
-  DBUG_PRINT("info", ("tid %llu -> table %p (%s)", table_id, e->table,
-                      MAYBE_TABLE_NAME(e->table)));
+  DBUG_PRINT("custom_info", ("tid %llu -> table %p (%s)", table_id, e->table,
+                             MAYBE_TABLE_NAME(e->table)));
   return 0;  // All OK
 }
 

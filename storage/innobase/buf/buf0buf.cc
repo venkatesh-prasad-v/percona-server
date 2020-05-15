@@ -4928,9 +4928,6 @@ buf_block_t *buf_page_create(const page_id_t &page_id,
 
   /* If we get here, the page was not in buf_pool: init it there */
 
-  DBUG_PRINT("ib_buf", ("create page " UINT32PF ":" UINT32PF, page_id.space(),
-                        page_id.page_no()));
-
   block = free_block;
 
   buf_page_init(buf_pool, page_id, page_size, block);
@@ -5548,10 +5545,6 @@ dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict) {
     default:
       ut_error;
   }
-
-  DBUG_PRINT("ib_buf", ("%s page " UINT32PF ":" UINT32PF,
-                        io_type == BUF_IO_READ ? "read" : "wrote",
-                        bpage->id.space(), bpage->id.page_no()));
 
   return DB_SUCCESS;
 }

@@ -99,7 +99,6 @@ Gtid_set::Gtid_set(Sid_map *_sid_map, const char *text,
 }
 
 void Gtid_set::init() {
-  DBUG_TRACE;
   has_cached_string_length = false;
   cached_string_length = 0;
   cached_string_format = nullptr;
@@ -114,7 +113,6 @@ void Gtid_set::init() {
 }
 
 Gtid_set::~Gtid_set() {
-  DBUG_TRACE;
   Interval_chunk *chunk = chunks;
   while (chunk != nullptr) {
     Interval_chunk *next_chunk = chunk->next;
@@ -131,10 +129,11 @@ Gtid_set::~Gtid_set() {
 enum_return_status Gtid_set::ensure_sidno(rpl_sidno sidno) {
   DBUG_TRACE;
   if (sid_lock != nullptr) sid_lock->assert_some_lock();
-  DBUG_PRINT("info", ("sidno=%d get_max_sidno()=%d sid_map=%p "
-                      "sid_map->get_max_sidno()=%d",
-                      sidno, get_max_sidno(), sid_map,
-                      sid_map != nullptr ? sid_map->get_max_sidno() : 0));
+  DBUG_PRINT("custom_info",
+             ("sidno=%d get_max_sidno()=%d sid_map=%p "
+              "sid_map->get_max_sidno()=%d",
+              sidno, get_max_sidno(), sid_map,
+              sid_map != nullptr ? sid_map->get_max_sidno() : 0));
   DBUG_ASSERT(sid_map == nullptr || sidno <= sid_map->get_max_sidno());
   DBUG_ASSERT(sid_map == nullptr ||
               get_max_sidno() <= sid_map->get_max_sidno());
@@ -303,7 +302,7 @@ void Gtid_set::add_gno_interval(Interval_iterator *ivitp, rpl_gno start,
   DBUG_TRACE;
   DBUG_ASSERT(start > 0);
   DBUG_ASSERT(start < end);
-  DBUG_PRINT("info", ("start=%lld end=%lld", start, end));
+  DBUG_PRINT("custom_info", ("start=%lld end=%lld", start, end));
   Interval *iv;
   Interval_iterator ivit = *ivitp;
   has_cached_string_length = false;
@@ -428,7 +427,7 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
   if (sid_lock != nullptr) sid_lock->assert_some_wrlock();
   const char *s = text;
 
-  DBUG_PRINT("info", ("adding '%s'", text));
+  DBUG_PRINT("custom_info", ("adding '%s'", text));
 
   if (anonymous != nullptr) *anonymous = false;
 
@@ -442,13 +441,13 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
   }
   SKIP_WHITESPACE();
   if (*s == 0) {
-    DBUG_PRINT("info", ("'%s' is empty", text));
+    DBUG_PRINT("custom_info", ("'%s' is empty", text));
     RETURN_OK;
   }
 
   Free_intervals_lock lock(this);
 
-  DBUG_PRINT("info", ("'%s' not only whitespace", text));
+  DBUG_PRINT("custom_info", ("'%s' not only whitespace", text));
   // Allocate space for all intervals at once, if nothing is allocated.
   if (chunks == nullptr) {
     // compute number of intervals in text: it is equal to the number of
@@ -473,7 +472,7 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
 
     // We allow empty Gtid_sets containing only commas.
     if (*s == 0) {
-      DBUG_PRINT("info", ("successfully parsed"));
+      DBUG_PRINT("custom_info", ("successfully parsed"));
       RETURN_OK;
     }
 
@@ -484,7 +483,7 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
     } else {
       rpl_sid sid;
       if (sid.parse(s, binary_log::Uuid::TEXT_LENGTH) != 0) {
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("expected UUID; found garbage '%.80s' at char %d in '%s'",
                     s, (int)(s - text), text));
         goto parse_error;
@@ -507,13 +506,14 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
         rpl_gno start = parse_gno(&s);
         if (start <= 0) {
           if (start == 0)
-            DBUG_PRINT("info", ("expected positive NUMBER; found zero "
-                                "('%.80s') at char %d in '%s'",
-                                s - 1, (int)(s - text) - 1, text));
+            DBUG_PRINT("custom_info", ("expected positive NUMBER; found zero "
+                                       "('%.80s') at char %d in '%s'",
+                                       s - 1, (int)(s - text) - 1, text));
           else
-            DBUG_PRINT("info", ("expected positive NUMBER; found zero or "
-                                "garbage '%.80s' at char %d in '%s'",
-                                s, (int)(s - text), text));
+            DBUG_PRINT("custom_info",
+                       ("expected positive NUMBER; found zero or "
+                        "garbage '%.80s' at char %d in '%s'",
+                        s, (int)(s - text), text));
 
           goto parse_error;
         }
@@ -551,9 +551,10 @@ enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous,
     // Must be end of string or comma. (Commas are consumed and
     // end-of-loop is detected at the beginning of the loop.)
     if (*s != ',' && *s != 0) {
-      DBUG_PRINT("info", ("expected end of string, UUID, or :NUMBER; found "
-                          "garbage '%.80s' at char %d in '%s'",
-                          s, (int)(s - text), text));
+      DBUG_PRINT("custom_info",
+                 ("expected end of string, UUID, or :NUMBER; found "
+                  "garbage '%.80s' at char %d in '%s'",
+                  s, (int)(s - text), text));
       goto parse_error;
     }
   }
@@ -815,9 +816,10 @@ size_t Gtid_set::to_string(char *buf, bool need_lock,
   memcpy(s, sf->end, sf->end_length);
   s += sf->end_length;
   *s = '\0';
-  DBUG_PRINT("info", ("ret='%s' strlen(s)=%zu s-buf=%lu get_string_length=%llu",
-                      buf, strlen(buf), (ulong)(s - buf),
-                      static_cast<unsigned long long>(get_string_length(sf))));
+  DBUG_PRINT("custom_info",
+             ("ret='%s' strlen(s)=%zu s-buf=%lu get_string_length=%llu", buf,
+              strlen(buf), (ulong)(s - buf),
+              static_cast<unsigned long long>(get_string_length(sf))));
   DBUG_ASSERT((ulong)(s - buf) == get_string_length(sf));
   if (sid_lock != nullptr && need_lock) sid_lock->unlock();
   return (int)(s - buf);
@@ -1235,8 +1237,9 @@ void Gtid_set::encode(uchar *buf) const {
     rpl_sidno sidno = sid_map->get_sorted_sidno(sid_i);
     // it is possible that the sid_map has more SIDNOs than the set.
     if (sidno > max_sidno) continue;
-    DBUG_PRINT("info", ("sid_i=%d sidno=%d max_sidno=%d sid_map->max_sidno=%d",
-                        sid_i, sidno, max_sidno, sid_map->get_max_sidno()));
+    DBUG_PRINT("custom_info",
+               ("sid_i=%d sidno=%d max_sidno=%d sid_map->max_sidno=%d", sid_i,
+                sidno, max_sidno, sid_map->get_max_sidno()));
     Const_interval_iterator ivit(this, sidno);
     const Interval *iv = ivit.get();
     if (iv != nullptr) {
@@ -1279,7 +1282,7 @@ enum_return_status Gtid_set::add_gtid_encoding(const uchar *encoded,
   Free_intervals_lock lock(this);
   // read number of SIDs
   if (length < 8) {
-    DBUG_PRINT("error", ("(length=%lu) < 8", (ulong)length));
+    DBUG_PRINT("custom_info", ("(length=%lu) < 8", (ulong)length));
     goto report_error;
   }
   n_sids = uint8korr(encoded);
@@ -1288,9 +1291,10 @@ enum_return_status Gtid_set::add_gtid_encoding(const uchar *encoded,
   for (uint sid_counter = 0; sid_counter < n_sids; sid_counter++) {
     // read SID and number of intervals
     if (length - pos < 16 + 8) {
-      DBUG_PRINT("error", ("(length=%lu) - (pos=%lu) < 16 + 8. "
-                           "[n_sids=%" PRIu64 " i=%u]",
-                           (ulong)length, (ulong)pos, n_sids, sid_counter));
+      DBUG_PRINT("custom_info",
+                 ("(length=%lu) - (pos=%lu) < 16 + 8. "
+                  "[n_sids=%" PRIu64 " i=%u]",
+                  (ulong)length, (ulong)pos, n_sids, sid_counter));
       goto report_error;
     }
     rpl_sid sid;
@@ -1300,7 +1304,7 @@ enum_return_status Gtid_set::add_gtid_encoding(const uchar *encoded,
     pos += 8;
     rpl_sidno sidno = sid_map->add_sid(sid);
     if (sidno < 0) {
-      DBUG_PRINT("error", ("sidno=%d", sidno));
+      DBUG_PRINT("custom_info", ("sidno=%d", sidno));
       RETURN_REPORTED_ERROR;
     }
     PROPAGATE_REPORTED_ERROR(ensure_sidno(sidno));
@@ -1321,7 +1325,7 @@ enum_return_status Gtid_set::add_gtid_encoding(const uchar *encoded,
       rpl_gno end = sint8korr(encoded + pos);
       pos += 8;
       if (start <= last || end <= start) {
-        DBUG_PRINT("error",
+        DBUG_PRINT("custom_info",
                    ("last=%lld start=%lld end=%lld", last, start, end));
         goto report_error;
       }
@@ -1331,14 +1335,14 @@ enum_return_status Gtid_set::add_gtid_encoding(const uchar *encoded,
       // from the beginning.
       Interval *current = ivit.get();
       if (current == nullptr || start < current->start) ivit.init(this, sidno);
-      DBUG_PRINT("info", ("adding %d:%lld-%lld", sidno, start, end - 1));
+      DBUG_PRINT("custom_info", ("adding %d:%lld-%lld", sidno, start, end - 1));
       add_gno_interval(&ivit, start, end, &lock);
     }
   }
   DBUG_ASSERT(pos <= length);
   if (actual_length == nullptr) {
     if (pos != length) {
-      DBUG_PRINT("error",
+      DBUG_PRINT("custom_info",
                  ("(pos=%lu) != (length=%lu)", (ulong)pos, (ulong)length));
       goto report_error;
     }

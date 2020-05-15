@@ -127,11 +127,11 @@ static int check_event_type(int type, Relay_log_info *rli) {
 
 void mysql_client_binlog_statement(THD *thd) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("binlog base64: '%*s'",
-                      (int)(thd->lex->binlog_stmt_arg.length < 2048
-                                ? thd->lex->binlog_stmt_arg.length
-                                : 2048),
-                      thd->lex->binlog_stmt_arg.str));
+  DBUG_PRINT("custom_info", ("binlog base64: '%*s'",
+                             (int)(thd->lex->binlog_stmt_arg.length < 2048
+                                       ? thd->lex->binlog_stmt_arg.length
+                                       : 2048),
+                             thd->lex->binlog_stmt_arg.str));
 
   Security_context *sctx = thd->security_context();
   if (!(sctx->check_access(SUPER_ACL) ||
@@ -199,7 +199,7 @@ void mysql_client_binlog_statement(THD *thd) {
     int64 bytes_decoded = base64_decode(strptr, coded_len, buf, &endptr,
                                         MY_BASE64_DECODE_ALLOW_MULTIPLE_CHUNKS);
 
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("bytes_decoded: %" PRId64 "  strptr: %p  endptr: %p ('%c':%d)",
                 bytes_decoded, strptr, endptr, *endptr, *endptr));
 
@@ -225,7 +225,7 @@ void mysql_client_binlog_statement(THD *thd) {
       order to be able to read exactly what is necessary.
     */
 
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("binlog base64 decoded_len: %lu  bytes_decoded: %" PRId64,
                 (ulong)decoded_len, bytes_decoded));
 
@@ -244,8 +244,8 @@ void mysql_client_binlog_statement(THD *thd) {
         my_error(ER_SYNTAX_ERROR, MYF(0));
         goto end;
       }
-      DBUG_PRINT("info", ("event_len=%lu, bytes_decoded=%" PRId64, event_len,
-                          bytes_decoded));
+      DBUG_PRINT("custom_info", ("event_len=%lu, bytes_decoded=%" PRId64,
+                                 event_len, bytes_decoded));
 
       if (check_event_type(bufptr[EVENT_TYPE_OFFSET], rli)) goto end;
 
@@ -253,7 +253,7 @@ void mysql_client_binlog_statement(THD *thd) {
           reinterpret_cast<unsigned char *>(bufptr), event_len,
           rli->get_rli_description_event(), false, &ev);
       if (binlog_read_error.has_error()) {
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("binlog base64 err=%s", binlog_read_error.get_str()));
         /*
           This could actually be an out-of-memory, but it is more likely
@@ -266,7 +266,8 @@ void mysql_client_binlog_statement(THD *thd) {
       bytes_decoded -= event_len;
       bufptr += event_len;
 
-      DBUG_PRINT("info", ("ev->common_header()=%d", ev->get_type_code()));
+      DBUG_PRINT("custom_info",
+                 ("ev->common_header()=%d", ev->get_type_code()));
       ev->thd = thd;
       /*
         We go directly to the application phase, since we don't need
@@ -301,7 +302,7 @@ void mysql_client_binlog_statement(THD *thd) {
     }
   }
 
-  DBUG_PRINT("info", ("binlog base64 execution finished successfully"));
+  DBUG_PRINT("custom_info", ("binlog base64 execution finished successfully"));
   my_ok(thd);
 
 end:

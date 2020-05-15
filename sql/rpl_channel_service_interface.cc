@@ -782,8 +782,8 @@ long long channel_get_last_delivered_gno(const char *channel, int sidno) {
   sid_lock->wrlock();
   retrieved_gtid_set->to_string(&retrieved_gtid_set_string);
   sid_lock->unlock();
-  DBUG_PRINT("info", ("get_last_delivered_gno retrieved_set_string: %s",
-                      retrieved_gtid_set_string));
+  DBUG_PRINT("custom_info", ("get_last_delivered_gno retrieved_set_string: %s",
+                             retrieved_gtid_set_string));
   my_free(retrieved_gtid_set_string);
 #endif
 

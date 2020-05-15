@@ -45,11 +45,9 @@ PSI_memory_key key_memory_Sid_map_Node;
 Sid_map::Sid_map(Checkable_rwlock *_sid_lock)
     : sid_lock(_sid_lock),
       _sidno_to_sid(key_memory_Sid_map_Node),
-      _sorted(key_memory_Sid_map_Node) {
-  DBUG_TRACE;
-}
+      _sorted(key_memory_Sid_map_Node) {}
 
-Sid_map::~Sid_map() { DBUG_TRACE; }
+Sid_map::~Sid_map() {}
 
 enum_return_status Sid_map::clear() {
   DBUG_TRACE;
@@ -64,12 +62,12 @@ rpl_sidno Sid_map::add_sid(const rpl_sid &sid) {
 #ifndef DBUG_OFF
   char buf[binary_log::Uuid::TEXT_LENGTH + 1];
   sid.to_string(buf);
-  DBUG_PRINT("info", ("SID=%s", buf));
+  DBUG_PRINT("custom_info", ("SID=%s", buf));
 #endif
   if (sid_lock) sid_lock->assert_some_lock();
   auto it = _sid_to_sidno.find(sid);
   if (it != _sid_to_sidno.end()) {
-    DBUG_PRINT("info", ("existed as sidno=%d", it->second->sidno));
+    DBUG_PRINT("custom_info", ("existed as sidno=%d", it->second->sidno));
     return it->second->sidno;
   }
 
@@ -81,7 +79,7 @@ rpl_sidno Sid_map::add_sid(const rpl_sid &sid) {
       sid_lock->wrlock();
     }
   }
-  DBUG_PRINT("info", ("is_wrlock=%d sid_lock=%p", is_wrlock, sid_lock));
+  DBUG_PRINT("custom_info", ("is_wrlock=%d sid_lock=%p", is_wrlock, sid_lock));
   rpl_sidno sidno;
   it = _sid_to_sidno.find(sid);
   if (it != _sid_to_sidno.end())

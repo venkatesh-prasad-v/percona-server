@@ -795,7 +795,7 @@ class binlog_cache_data {
     a savepoint. It doesn't change transaction state.
    */
   void truncate(my_off_t pos) {
-    DBUG_PRINT("info", ("truncating to position %lu", (ulong)pos));
+    DBUG_PRINT("custom_info", ("truncating to position %lu", (ulong)pos));
     remove_pending_event();
 
     // TODO: check the return value.
@@ -1472,7 +1472,7 @@ bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
         error = true;
       }
     } else {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("thd->variables.gtid_next.type=%d "
                   "thd->owned_gtid.sidno=%d",
                   head->variables.gtid_next.type, head->owned_gtid.sidno));
@@ -1649,7 +1649,7 @@ bool MYSQL_BIN_LOG::write_gtid(THD *thd, binlog_cache_data *cache_data,
                        YESNO(writer->is_checksum_enabled())));
   DBUG_PRINT("debug", ("gtid_event.get_event_length()= %lu",
                        static_cast<ulong>(gtid_event.get_event_length())));
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("transaction_length= %llu", gtid_event.transaction_length));
 
   bool ret = gtid_event.write(writer);
@@ -1660,7 +1660,7 @@ bool MYSQL_BIN_LOG::write_gtid(THD *thd, binlog_cache_data *cache_data,
 int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
   DBUG_TRACE;
 
-  DBUG_PRINT("info", ("query=%s", thd->query().str));
+  DBUG_PRINT("custom_info", ("query=%s", thd->query().str));
 
   if (thd->owned_gtid.sidno > 0) {
     DBUG_ASSERT(thd->variables.gtid_next.type == ASSIGNED_GTID);
@@ -1676,7 +1676,11 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
         (This only happens for DDL, since DML will save the GTID into
         table and release ownership inside ha_commit_trans.)
       */
+      DBUG_PRINT("custom_info",
+                 ("gtid_end_transaction - Updating into gtid_executed table"));
       if (gtid_state->save(thd) != 0) {
+        DBUG_PRINT("custom_info",
+                   ("gtid_end_transaction - Rollback on update"));
         gtid_state->update_on_rollback(thd);
         return 1;
       } else if (!has_commit_order_manager(thd)) {
@@ -1753,7 +1757,9 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
         Write BEGIN event and then commit (which will generate commit
         event and Gtid_log_event)
       */
-      DBUG_PRINT("debug", ("Writing to trx_cache"));
+      DBUG_PRINT(
+          "custom_info",
+          ("Writing to trx_cache. Injecting empty transaction to binlog"));
       if (cache_data->write_event(&qinfo) || mysql_bin_log.commit(thd, true))
         return 1;
     }
@@ -2031,7 +2037,7 @@ int binlog_trx_cache_data::truncate(THD *thd, bool all) {
   DBUG_TRACE;
   int error = 0;
 
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("thd->options={ %s %s}, transaction: %s",
               FLAGSTR(thd->variables.option_bits, OPTION_NOT_AUTOCOMMIT),
               FLAGSTR(thd->variables.option_bits, OPTION_BEGIN),
@@ -3801,7 +3807,7 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
     Transaction_boundary_parser *trx_parser,
     Gtid_monitoring_info *partial_trx) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("Opening file %s", filename));
+  DBUG_PRINT("custom_info", ("Opening file %s", filename));
 
   DBUG_ASSERT(retrieved_gtids != nullptr);
   DBUG_ASSERT(trx_parser != nullptr);
@@ -3831,7 +3837,7 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
   ulong data_len = 0;
 
   while (!error && (ev = relaylog_file_reader.read_event_object()) != nullptr) {
-    DBUG_PRINT("info", ("Read event of type %s", ev->get_type_str()));
+    DBUG_PRINT("custom_info", ("Read event of type %s", ev->get_type_str()));
 #ifndef DBUG_OFF
     event_counter++;
 #endif
@@ -3910,11 +3916,12 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
         GTID(1) transaction is not complete.
       */
       if (partial_trx->is_processing_trx_set()) {
-        DBUG_PRINT("info", ("Discarding Gtid(%d, %lld) as the transaction "
-                            "wasn't complete and we found an error in the"
-                            "transaction boundary parser.",
-                            partial_trx->get_processing_trx_gtid()->sidno,
-                            partial_trx->get_processing_trx_gtid()->gno));
+        DBUG_PRINT("custom_info",
+                   ("Discarding Gtid(%d, %lld) as the transaction "
+                    "wasn't complete and we found an error in the"
+                    "transaction boundary parser.",
+                    partial_trx->get_processing_trx_gtid()->sidno,
+                    partial_trx->get_processing_trx_gtid()->gno));
         partial_trx->clear_processing_trx();
       }
     }
@@ -3935,8 +3942,9 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
         }
 #ifndef DBUG_OFF
         char *prev_buffer = prev_gtids_ev->get_str(nullptr, nullptr);
-        DBUG_PRINT("info", ("Got Previous_gtids from file '%s': Gtid_set='%s'.",
-                            filename, prev_buffer));
+        DBUG_PRINT("custom_info",
+                   ("Got Previous_gtids from file '%s': Gtid_set='%s'.",
+                    filename, prev_buffer));
         my_free(prev_buffer);
 #endif
         break;
@@ -3976,7 +3984,7 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
             partial_trx->start(gtid, original_commit_timestamp,
                                immediate_commit_timestamp);
           }
-          DBUG_PRINT("info",
+          DBUG_PRINT("custom_info",
                      ("Found Gtid in relaylog file '%s': Gtid(%d, %lld).",
                       filename, sidno, gtid_ev->get_gno()));
         }
@@ -3994,11 +4002,12 @@ static bool read_gtids_and_update_trx_parser_from_relaylog(
           if (partial_trx->is_processing_trx_set()) {
             const Gtid *fully_retrieved_gtid;
             fully_retrieved_gtid = partial_trx->get_processing_trx_gtid();
-            DBUG_PRINT("info", ("Adding Gtid to Retrieved_Gtid_Set as the "
-                                "transaction was completed at "
-                                "relaylog file '%s': Gtid(%d, %lld).",
-                                filename, fully_retrieved_gtid->sidno,
-                                fully_retrieved_gtid->gno));
+            DBUG_PRINT("custom_info",
+                       ("Adding Gtid to Retrieved_Gtid_Set as the "
+                        "transaction was completed at "
+                        "relaylog file '%s': Gtid(%d, %lld).",
+                        filename, fully_retrieved_gtid->sidno,
+                        fully_retrieved_gtid->gno));
             retrieved_gtids->_add_gtid(*fully_retrieved_gtid);
             /*
              We don't need to update the last queued structure here. We just
@@ -4072,7 +4081,7 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
     Gtid *first_gtid, Sid_map *sid_map, bool verify_checksum,
     bool is_relay_log) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("Opening file %s", filename));
+  DBUG_PRINT("custom_info", ("Opening file %s", filename));
 
 #ifndef DBUG_OFF
   unsigned long event_counter = 0;
@@ -4110,7 +4119,7 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
 #ifndef DBUG_OFF
     event_counter++;
 #endif
-    DBUG_PRINT("info", ("Read event of type %s", ev->get_type_str()));
+    DBUG_PRINT("custom_info", ("Read event of type %s", ev->get_type_str()));
     switch (ev->get_type_code()) {
       case binary_log::FORMAT_DESCRIPTION_EVENT:
       case binary_log::ROTATE_EVENT:
@@ -4128,8 +4137,9 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
           ret = ERROR, done = true;
 #ifndef DBUG_OFF
         char *prev_buffer = prev_gtids_ev->get_str(nullptr, nullptr);
-        DBUG_PRINT("info", ("Got Previous_gtids from file '%s': Gtid_set='%s'.",
-                            filename, prev_buffer));
+        DBUG_PRINT("custom_info",
+                   ("Got Previous_gtids from file '%s': Gtid_set='%s'.",
+                    filename, prev_buffer));
         my_free(prev_buffer);
 #endif
         /*
@@ -4193,8 +4203,9 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
               if (all_gtids->ensure_sidno(sidno) != RETURN_STATUS_OK)
                 ret = ERROR, done = true;
               all_gtids->_add_gtid(sidno, gtid_ev->get_gno());
-              DBUG_PRINT("info", ("Got Gtid from file '%s': Gtid(%d, %lld).",
-                                  filename, sidno, gtid_ev->get_gno()));
+              DBUG_PRINT("custom_info",
+                         ("Got Gtid from file '%s': Gtid(%d, %lld).", filename,
+                          sidno, gtid_ev->get_gno()));
             }
 
             /* If the first GTID was requested, stores it */
@@ -4244,7 +4255,7 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
         break;
     }
     delete ev;
-    DBUG_PRINT("info", ("done=%d", done));
+    DBUG_PRINT("custom_info", ("done=%d", done));
   }
 
   if (binlog_file_reader.has_fatal_error()) {
@@ -4258,19 +4269,19 @@ static enum_read_gtids_from_binlog_status read_gtids_from_binlog(
   if (all_gtids)
     all_gtids->dbug_print("all_gtids");
   else
-    DBUG_PRINT("info", ("all_gtids==NULL"));
+    DBUG_PRINT("custom_info", ("all_gtids==NULL"));
   if (prev_gtids)
     prev_gtids->dbug_print("prev_gtids");
   else
-    DBUG_PRINT("info", ("prev_gtids==NULL"));
+    DBUG_PRINT("custom_info", ("prev_gtids==NULL"));
   if (first_gtid == nullptr)
-    DBUG_PRINT("info", ("first_gtid==NULL"));
+    DBUG_PRINT("custom_info", ("first_gtid==NULL"));
   else if (first_gtid->sidno == 0)
-    DBUG_PRINT("info", ("first_gtid.sidno==0"));
+    DBUG_PRINT("custom_info", ("first_gtid.sidno==0"));
   else
     first_gtid->dbug_print(sid_map, "first_gtid");
 
-  DBUG_PRINT("info", ("returning %d", ret));
+  DBUG_PRINT("custom_info", ("returning %d", ret));
 #ifndef DBUG_OFF
   if (!is_relay_log && prev_gtids != nullptr && all_gtids == nullptr &&
       first_gtid == nullptr)
@@ -4319,15 +4330,16 @@ bool MYSQL_BIN_LOG::find_first_log_not_in_gtid_set(char *binlog_file_name,
     We also ask for the first GTID in the binary log to know if we
     should send the FD event with the "created" field cleared or not.
   */
-  DBUG_PRINT("info", ("Iterating backwards through binary logs, and reading "
-                      "only the Previous_gtids_log_event, to find the first "
-                      "one, that is the subset of the given gtid set."));
+  DBUG_PRINT("custom_info",
+             ("Iterating backwards through binary logs, and reading "
+              "only the Previous_gtids_log_event, to find the first "
+              "one, that is the subset of the given gtid set."));
   rit = filename_list.rbegin();
   error = 0;
   while (rit != filename_list.rend()) {
     binlog_previous_gtid_set.clear();
     const char *filename = rit->c_str();
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("Read Previous_gtids_log_event from filename='%s'", filename));
     switch (read_gtids_from_binlog(filename, nullptr, &binlog_previous_gtid_set,
                                    first_gtid,
@@ -4374,7 +4386,7 @@ bool MYSQL_BIN_LOG::find_first_log_not_in_gtid_set(char *binlog_file_name,
 end:
   if (error) DBUG_PRINT("error", ("'%s'", *errmsg));
   filename_list.clear();
-  DBUG_PRINT("info", ("returning %d", error));
+  DBUG_PRINT("custom_info", ("returning %d", error));
   return error != 0 ? true : false;
 }
 
@@ -4450,17 +4462,17 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
 
   error = 0;
   if (all_gtids != nullptr) {
-    DBUG_PRINT("info", ("Iterating backwards through %s logs, "
-                        "looking for the last %s log that contains "
-                        "a Previous_gtids_log_event.",
-                        is_relay_log ? "relay" : "binary",
-                        is_relay_log ? "relay" : "binary"));
+    DBUG_PRINT("custom_info", ("Iterating backwards through %s logs, "
+                               "looking for the last %s log that contains "
+                               "a Previous_gtids_log_event.",
+                               is_relay_log ? "relay" : "binary",
+                               is_relay_log ? "relay" : "binary"));
     // Iterate over all files in reverse order until we find one that
     // contains a Previous_gtids_log_event.
     rit = filename_list.rbegin();
     bool can_stop_reading = false;
     reached_first_file = (rit == filename_list.rend());
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("filename='%s' reached_first_file=%d",
                 reached_first_file ? "" : rit->c_str(), reached_first_file));
     while (!can_stop_reading && !reached_first_file) {
@@ -4468,9 +4480,10 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
       DBUG_ASSERT(rit != filename_list.rend());
       rit++;
       reached_first_file = (rit == filename_list.rend());
-      DBUG_PRINT("info", ("filename='%s' can_stop_reading=%d "
-                          "reached_first_file=%d, ",
-                          filename, can_stop_reading, reached_first_file));
+      DBUG_PRINT("custom_info",
+                 ("filename='%s' can_stop_reading=%d "
+                  "reached_first_file=%d, ",
+                  filename, can_stop_reading, reached_first_file));
       switch (read_gtids_from_binlog(
           filename, all_gtids, reached_first_file ? lost_gtids : nullptr,
           nullptr /* first_gtid */, sid_map, verify_checksum, is_relay_log)) {
@@ -4572,13 +4585,13 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
       trx_parser->reset();
       partial_trx->clear();
 
-      DBUG_PRINT("info", ("Iterating forwards through relay logs, "
-                          "updating the Retrieved_Gtid_Set and updating "
-                          "IO thread trx parser before start."));
+      DBUG_PRINT("custom_info", ("Iterating forwards through relay logs, "
+                                 "updating the Retrieved_Gtid_Set and updating "
+                                 "IO thread trx parser before start."));
       for (it = find(filename_list.begin(), filename_list.end(), *rit);
            it != filename_list.end(); it++) {
         const char *filename = it->c_str();
-        DBUG_PRINT("info", ("filename='%s'", filename));
+        DBUG_PRINT("custom_info", ("filename='%s'", filename));
         if (read_gtids_and_update_trx_parser_from_relaylog(
                 filename, all_gtids, true, trx_parser, partial_trx)) {
           error = 1;
@@ -4610,9 +4623,10 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
       GTID_PURGED will be correctly set (assuming binlog_gtid_simple_recovery
       is not enabled).
     */
-    DBUG_PRINT("info", ("Iterating forwards through binary logs, looking for "
-                        "the first binary log that contains both a "
-                        "Previous_gtids_log_event and a Gtid_log_event."));
+    DBUG_PRINT("custom_info",
+               ("Iterating forwards through binary logs, looking for "
+                "the first binary log that contains both a "
+                "Previous_gtids_log_event and a Gtid_log_event."));
     DBUG_ASSERT(!is_relay_log);
     for (it = filename_list.begin(); it != filename_list.end(); it++) {
       /*
@@ -4623,7 +4637,7 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
       */
       Gtid first_gtid = {0, 0};
       const char *filename = it->c_str();
-      DBUG_PRINT("info", ("filename='%s'", filename));
+      DBUG_PRINT("custom_info", ("filename='%s'", filename));
       switch (read_gtids_from_binlog(
           filename, nullptr, lost_gtids,
           binlog_gtid_simple_recovery ? nullptr : &first_gtid, sid_map,
@@ -4668,7 +4682,7 @@ end:
     if (all_gtids != nullptr) mysql_mutex_unlock(&LOCK_log);
   }
   filename_list.clear();
-  DBUG_PRINT("info", ("returning %d", error));
+  DBUG_PRINT("custom_info", ("returning %d", error));
   return error != 0 ? true : false;
 }
 
@@ -4703,7 +4717,7 @@ bool MYSQL_BIN_LOG::open_binlog(
     return true;
   }
 
-  DBUG_PRINT("info", ("generated filename: %s", log_file_name));
+  DBUG_PRINT("custom_info", ("generated filename: %s", log_file_name));
 
   if (open_purge_index_file(true) ||
       register_create_index_entry(log_file_name) || sync_purge_index_file() ||
@@ -4824,8 +4838,8 @@ bool MYSQL_BIN_LOG::open_binlog(
       }
       logged_gtids_binlog.remove_gtid_set(gtids_only_in_table);
     }
-    DBUG_PRINT("info", ("Generating PREVIOUS_GTIDS for %s file.",
-                        is_relay_log ? "relaylog" : "binlog"));
+    DBUG_PRINT("custom_info", ("Generating PREVIOUS_GTIDS for %s file.",
+                               is_relay_log ? "relaylog" : "binlog"));
     Previous_gtids_log_event prev_gtids_ev(previous_logged_gtids);
     if (is_relay_log) prev_gtids_ev.set_relay_log_event();
     if (need_sid_lock) sid_lock->unlock();
@@ -4861,7 +4875,8 @@ bool MYSQL_BIN_LOG::open_binlog(
       else
         sid_lock->assert_some_wrlock(); /* purecov: inspected */
 
-      DBUG_PRINT("info", ("Generating PREVIOUS_GTIDS for relaylog file."));
+      DBUG_PRINT("custom_info",
+                 ("Generating PREVIOUS_GTIDS for relaylog file."));
       Previous_gtids_log_event prev_gtids_ev(previous_gtid_set_relaylog);
       prev_gtids_ev.set_relay_log_event();
 
@@ -5312,7 +5327,7 @@ int MYSQL_BIN_LOG::find_log_pos(LOG_INFO *linfo, const char *log_name,
     }
     // if the log entry matches, null string matching anything
     if (!log_name || !compare_log_name(full_fname, full_log_name)) {
-      DBUG_PRINT("info", ("Found log file entry"));
+      DBUG_PRINT("custom_info", ("Found log file entry"));
       linfo->index_file_start_offset = offset;
       linfo->index_file_offset = my_b_tell(&index_file);
       break;
@@ -5779,7 +5794,7 @@ int MYSQL_BIN_LOG::purge_logs(const char *to_log, bool included,
   LOG_INFO log_info;
   THD *thd = current_thd;
   DBUG_TRACE;
-  DBUG_PRINT("info", ("to_log= %s", to_log));
+  DBUG_PRINT("custom_info", ("to_log= %s", to_log));
 
   if (need_lock_index)
     mysql_mutex_lock(&LOCK_index);
@@ -6070,7 +6085,7 @@ int MYSQL_BIN_LOG::purge_index_entry(THD *thd, ulonglong *decrease_log_space,
           ha_binlog_index_purge_file(current_thd, log_info.log_file_name);
         }
 
-        DBUG_PRINT("info", ("purging %s", log_info.log_file_name));
+        DBUG_PRINT("custom_info", ("purging %s", log_info.log_file_name));
         if (!mysql_file_delete(key_file_binlog, log_info.log_file_name,
                                MYF(0))) {
           DBUG_EXECUTE_IF("wait_in_purge_index_entry", {
@@ -6106,8 +6121,9 @@ int MYSQL_BIN_LOG::purge_index_entry(THD *thd, ulonglong *decrease_log_space,
                      log_info.log_file_name);
             }
             if (my_errno() == EMFILE) {
-              DBUG_PRINT("info", ("my_errno: %d, set ret = LOG_INFO_EMFILE",
-                                  my_errno()));
+              DBUG_PRINT(
+                  "custom_info",
+                  ("my_errno: %d, set ret = LOG_INFO_EMFILE", my_errno()));
               error = LOG_INFO_EMFILE;
               goto err;
             }
@@ -6258,10 +6274,10 @@ int MYSQL_BIN_LOG::purge_logs_by_size(bool need_lock_index) {
     */
     else if (binlog_space_total + binlog_pos > binlog_space_limit) {
       if ((log_in_use(log_info.log_file_name))) break;
-      DBUG_PRINT("info", ("purge_logs_by_size binlog_space_total=%llu "
-                          "binlog_pos=%llu sum=%llu\n",
-                          binlog_space_total, binlog_pos,
-                          binlog_space_total + binlog_pos));
+      DBUG_PRINT("custom_info", ("purge_logs_by_size binlog_space_total=%llu "
+                                 "binlog_pos=%llu sum=%llu\n",
+                                 binlog_space_total, binlog_pos,
+                                 binlog_space_total + binlog_pos));
       if (binlog_space_total >= (ulonglong)stat_area.st_size)
         binlog_space_total -= stat_area.st_size;
       else
@@ -6507,7 +6523,7 @@ int MYSQL_BIN_LOG::new_file_impl(
 
   DBUG_TRACE;
   if (!is_open()) {
-    DBUG_PRINT("info", ("log is closed"));
+    DBUG_PRINT("custom_info", ("log is closed"));
     return error;
   }
 
@@ -6736,7 +6752,7 @@ end:
 */
 bool MYSQL_BIN_LOG::after_write_to_relay_log(Master_info *mi) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("max_size: %lu", max_size));
+  DBUG_PRINT("custom_info", ("max_size: %lu", max_size));
 
   // Check pre-conditions
   mysql_mutex_assert_owner(&LOCK_log);
@@ -6752,8 +6768,8 @@ bool MYSQL_BIN_LOG::after_write_to_relay_log(Master_info *mi) {
   if (m_binlog_file->get_real_file_size() >
           DBUG_EVALUATE_IF("rotate_slave_debug_group", 500, max_size) &&
       !can_rotate) {
-    DBUG_PRINT("info", ("Postponing the rotation by size waiting for "
-                        "the end of the current transaction."));
+    DBUG_PRINT("custom_info", ("Postponing the rotation by size waiting for "
+                               "the end of the current transaction."));
   }
 #endif
 
@@ -6933,7 +6949,8 @@ int MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
   binlog_cache_data *cache_data =
       cache_mngr->get_binlog_cache_data(is_transactional);
 
-  DBUG_PRINT("info", ("cache_mngr->pending(): %p", cache_data->pending()));
+  DBUG_PRINT("custom_info",
+             ("cache_mngr->pending(): %p", cache_data->pending()));
 
   if (Rows_log_event *pending = cache_data->pending()) {
     /*
@@ -7025,7 +7042,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
     binlog_cache_data *cache_data =
         cache_mngr->get_binlog_cache_data(is_trans_cache);
 
-    DBUG_PRINT("info", ("event type: %d", event_info->get_type_code()));
+    DBUG_PRINT("custom_info", ("event type: %d", event_info->get_type_code()));
 
     /*
        No check for auto events flag here - this write method should
@@ -7300,7 +7317,7 @@ bool MYSQL_BIN_LOG::do_write_cache(Binlog_cache_storage *cache,
 
 #ifndef DBUG_OFF
   uint64 expected_total_len = cache->length();
-  DBUG_PRINT("info", ("bytes in cache= %" PRIu64, expected_total_len));
+  DBUG_PRINT("custom_info", ("bytes in cache= %" PRIu64, expected_total_len));
 #endif
 
   bool error = false;
@@ -7551,9 +7568,10 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data,
     if (!cache->is_empty()) {
       DBUG_EXECUTE_IF("crash_before_writing_xid", {
         if (do_write_cache(cache, writer))
-          DBUG_PRINT("info", ("error writing binlog cache: %d", write_error));
+          DBUG_PRINT("custom_info",
+                     ("error writing binlog cache: %d", write_error));
         flush_and_sync(true);
-        DBUG_PRINT("info", ("crashing before writing xid"));
+        DBUG_PRINT("custom_info", ("crashing before writing xid"));
         DBUG_SUICIDE();
       });
       if (do_write_cache(cache, writer)) goto err;
@@ -7727,7 +7745,7 @@ void MYSQL_BIN_LOG::harvest_bytes_written(Relay_log_info *rli,
   else
     mysql_mutex_assert_owner(&rli->log_space_lock);
   rli->log_space_total += bytes_written;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("relay_log_space: %s  bytes_written: %s",
               llstr(rli->log_space_total, buf1), llstr(bytes_written, buf2)));
   bytes_written = 0;
@@ -7999,7 +8017,7 @@ int MYSQL_BIN_LOG::prepare(THD *thd, bool all) {
 */
 TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
   DBUG_TRACE;
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("query='%s'", thd == current_thd ? thd->query().str : nullptr));
   binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(thd);
   Transaction_ctx *trn_ctx = thd->get_transaction();
@@ -8410,7 +8428,7 @@ int MYSQL_BIN_LOG::process_flush_stage_queue(my_off_t *total_bytes_var,
        DBUG_EVALUATE_IF("simulate_max_binlog_size", true, false)))
     *rotate_var = true;
 #ifndef DBUG_OFF
-  DBUG_PRINT("info", ("no_flushes:= %d", no_flushes));
+  DBUG_PRINT("custom_info", ("no_flushes:= %d", no_flushes));
   no_flushes = 0;
 #endif
   return flush_error;
@@ -10027,10 +10045,11 @@ const char *get_locked_tables_mode_name(
 
 int THD::decide_logging_format(TABLE_LIST *tables) {
   DBUG_TRACE;
-  DBUG_PRINT("info", ("query: %s", query().str));
-  DBUG_PRINT("info", ("variables.binlog_format: %lu", variables.binlog_format));
-  DBUG_PRINT("info", ("lex->get_stmt_unsafe_flags(): 0x%x",
-                      lex->get_stmt_unsafe_flags()));
+  DBUG_PRINT("custom_info", ("query: %s", query().str));
+  DBUG_PRINT("custom_info",
+             ("variables.binlog_format: %lu", variables.binlog_format));
+  DBUG_PRINT("custom_info", ("lex->get_stmt_unsafe_flags(): 0x%x",
+                             lex->get_stmt_unsafe_flags()));
 
 #if defined(ENABLED_DEBUG_SYNC)
   if (!is_attachable_ro_transaction_active())
@@ -10191,8 +10210,8 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
       }
       handler::Table_flags const flags = table->table->file->ha_table_flags();
 
-      DBUG_PRINT("info", ("table: %s; ha_table_flags: 0x%llx",
-                          table->table_name, flags));
+      DBUG_PRINT("custom_info", ("table: %s; ha_table_flags: 0x%llx",
+                                 table->table_name, flags));
 
       if (table->table->no_replicate) {
         if (!warned_gtid_executed_table) {
@@ -10327,12 +10346,14 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
         write_all_non_transactional_are_tmp_tables &&
         write_to_some_non_transactional_table;
 
-    DBUG_PRINT("info", ("flags_write_all_set: 0x%llx", flags_write_all_set));
-    DBUG_PRINT("info", ("flags_write_some_set: 0x%llx", flags_write_some_set));
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
+               ("flags_write_all_set: 0x%llx", flags_write_all_set));
+    DBUG_PRINT("custom_info",
+               ("flags_write_some_set: 0x%llx", flags_write_some_set));
+    DBUG_PRINT("custom_info",
                ("flags_access_some_set: 0x%llx", flags_access_some_set));
-    DBUG_PRINT("info", ("multi_write_engine: %d", multi_write_engine));
-    DBUG_PRINT("info", ("multi_access_engine: %d", multi_access_engine));
+    DBUG_PRINT("custom_info", ("multi_write_engine: %d", multi_write_engine));
+    DBUG_PRINT("custom_info", ("multi_access_engine: %d", multi_access_engine));
 
     int error = 0;
     int unsafe_flags;
@@ -10421,11 +10442,12 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
              binlog_format = STATEMENT
         */
         binlog_unsafe_warning_flags |= unsafe_flags;
-        DBUG_PRINT("info", ("Scheduling warning to be issued by "
-                            "binlog_query: '%s'",
-                            ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
-        DBUG_PRINT("info", ("binlog_unsafe_warning_flags: 0x%x",
-                            binlog_unsafe_warning_flags));
+        DBUG_PRINT("custom_info",
+                   ("Scheduling warning to be issued by "
+                    "binlog_query: '%s'",
+                    ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
+        DBUG_PRINT("custom_info", ("binlog_unsafe_warning_flags: 0x%x",
+                                   binlog_unsafe_warning_flags));
       }
       /* log in statement format! */
     }
@@ -10453,11 +10475,12 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
                binlog_format = STATEMENT
           */
           binlog_unsafe_warning_flags |= unsafe_flags;
-          DBUG_PRINT("info", ("Scheduling warning to be issued by "
-                              "binlog_query: '%s'",
-                              ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
-          DBUG_PRINT("info", ("binlog_unsafe_warning_flags: 0x%x",
-                              binlog_unsafe_warning_flags));
+          DBUG_PRINT("custom_info",
+                     ("Scheduling warning to be issued by "
+                      "binlog_query: '%s'",
+                      ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
+          DBUG_PRINT("custom_info", ("binlog_unsafe_warning_flags: 0x%x",
+                                     binlog_unsafe_warning_flags));
         }
         /* log in statement format! */
       }
@@ -10471,7 +10494,8 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
             is_create_drop_temp_table) {
 #ifndef DBUG_OFF
           int flags = lex->get_stmt_unsafe_flags();
-          DBUG_PRINT("info", ("setting row format for unsafe statement"));
+          DBUG_PRINT("custom_info",
+                     ("setting row format for unsafe statement"));
           for (int i = 0; i < Query_tables_list::BINLOG_STMT_UNSAFE_COUNT;
                i++) {
             if (flags & (1 << i))
@@ -10482,10 +10506,11 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
                        current_thd,
                        Query_tables_list::binlog_stmt_unsafe_errcode[i])));
           }
-          DBUG_PRINT("info",
+          DBUG_PRINT("custom_info",
                      ("is_row_injection=%d", lex->is_stmt_row_injection()));
-          DBUG_PRINT("info", ("stmt_capable=%llu",
-                              (flags_write_all_set & HA_BINLOG_STMT_CAPABLE)));
+          DBUG_PRINT("custom_info",
+                     ("stmt_capable=%llu",
+                      (flags_write_all_set & HA_BINLOG_STMT_CAPABLE)));
 #endif
           /* log in row format! */
           set_current_stmt_binlog_format_row_if_mixed();
@@ -10495,7 +10520,7 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
 
     if (non_replicated_tables_count > 0) {
       if ((replicated_tables_count == 0) || !is_write) {
-        DBUG_PRINT("info",
+        DBUG_PRINT("custom_info",
                    ("decision: no logging, no replicated table affected"));
         set_binlog_local_stmt_filter();
       } else {
@@ -10516,7 +10541,8 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
       error = 1;
 
     if (error) {
-      DBUG_PRINT("info", ("decision: no logging since an error was generated"));
+      DBUG_PRINT("custom_info",
+                 ("decision: no logging since an error was generated"));
       return -1;
     }
 
@@ -10546,7 +10572,7 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
           add_to_binlog_accessed_dbs(table->db);
       }
     }
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("decision: logging in %s format",
                 is_current_stmt_binlog_format_row() ? "ROW" : "STATEMENT"));
 
@@ -10634,10 +10660,11 @@ static bool handle_gtid_consistency_violation(THD *thd, int error_code,
       get_gtid_consistency_mode();
   enum_gtid_mode gtid_mode = get_gtid_mode(GTID_MODE_LOCK_SID);
 
-  DBUG_PRINT("info", ("gtid_next.type=%d gtid_mode=%s "
-                      "gtid_consistency_mode=%d error=%d query=%s",
-                      gtid_next_type, get_gtid_mode_string(gtid_mode),
-                      gtid_consistency_mode, error_code, thd->query().str));
+  DBUG_PRINT("custom_info",
+             ("gtid_next.type=%d gtid_mode=%s "
+              "gtid_consistency_mode=%d error=%d query=%s",
+              gtid_next_type, get_gtid_mode_string(gtid_mode),
+              gtid_consistency_mode, error_code, thd->query().str));
 
   /*
     GTID violations should generate error if:
@@ -10711,7 +10738,7 @@ bool THD::is_ddl_gtid_compatible() {
       mysql_bin_log.is_open() == false)
     return true;
 
-  DBUG_PRINT("info",
+  DBUG_PRINT("custom_info",
              ("SQLCOM_CREATE:%d CREATE-TMP:%d SELECT:%d SQLCOM_DROP:%d "
               "DROP-TMP:%d trx:%d",
               lex->sql_command == SQLCOM_CREATE_TABLE,
@@ -10785,15 +10812,16 @@ bool THD::is_dml_gtid_compatible(bool some_transactional_table,
     old tests that were not written with the restrictions of GTIDs in
     mind.
   */
-  DBUG_PRINT("info", ("some_non_transactional_table=%d "
-                      "some_transactional_table=%d "
-                      "trans_has_updated_trans_table=%d "
-                      "non_transactional_tables_are_tmp=%d "
-                      "is_current_stmt_binlog_format_row=%d",
-                      some_non_transactional_table, some_transactional_table,
-                      trans_has_updated_trans_table(this),
-                      non_transactional_tables_are_tmp,
-                      is_current_stmt_binlog_format_row()));
+  DBUG_PRINT(
+      "custom_info",
+      ("some_non_transactional_table=%d "
+       "some_transactional_table=%d "
+       "trans_has_updated_trans_table=%d "
+       "non_transactional_tables_are_tmp=%d "
+       "is_current_stmt_binlog_format_row=%d",
+       some_non_transactional_table, some_transactional_table,
+       trans_has_updated_trans_table(this), non_transactional_tables_are_tmp,
+       is_current_stmt_binlog_format_row()));
   if (some_non_transactional_table &&
       (some_transactional_table || trans_has_updated_trans_table(this)) &&
       !(non_transactional_tables_are_tmp &&
@@ -11436,7 +11464,8 @@ static void do_unsafe_limit_checkout(char *buf, int unsafe_type,
         if ((now - limit_unsafe_suppression_start_time) <=
             LIMIT_UNSAFE_WARNING_ACTIVATION_TIMEOUT) {
           unsafe_warning_suppression_is_activated = true;
-          DBUG_PRINT("info", ("A warning flood has been detected and the limit \
+          DBUG_PRINT("custom_info",
+                     ("A warning flood has been detected and the limit \
 unsafety warning suppression has been activated."));
         } else {
           /*
@@ -11461,7 +11490,8 @@ unsafety warning suppression has been activated."));
         if ((now - limit_unsafe_suppression_start_time) >
             LIMIT_UNSAFE_WARNING_ACTIVATION_TIMEOUT) {
           reset_binlog_unsafe_suppression();
-          DBUG_PRINT("info", ("The limit unsafety warning supression has been \
+          DBUG_PRINT("custom_info",
+                     ("The limit unsafety warning supression has been \
 deactivated"));
         }
       }

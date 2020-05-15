@@ -105,9 +105,9 @@ bool Rpl_encryption::initialize() {
 
 #ifndef DBUG_OFF
   m_initialized = true;
-  DBUG_PRINT("debug", ("m_enabled= %s", m_enabled ? "true" : "false"));
-  DBUG_PRINT("debug", ("m_rotate_at_startup= %s",
-                       m_rotate_at_startup ? "true" : "false"));
+  DBUG_PRINT("custom_info", ("m_enabled= %s", m_enabled ? "true" : "false"));
+  DBUG_PRINT("custom_info", ("m_rotate_at_startup= %s",
+                             m_rotate_at_startup ? "true" : "false"));
 #endif
 
   if (m_rotate_at_startup && !m_enabled) {
@@ -193,11 +193,11 @@ bool Rpl_encryption::recover_master_key() {
   std::pair<Rpl_encryption::Keyring_status, unsigned int> new_master_key_seqno;
   std::pair<Rpl_encryption::Keyring_status, unsigned int> old_master_key_seqno;
 
-  DBUG_PRINT("debug", ("m_master_key_seqno=%u", m_master_key_seqno));
+  DBUG_PRINT("custom_info", ("m_master_key_seqno=%u", m_master_key_seqno));
   /* Retrieve master key seqno from keyring */
   auto master_key_seqno = get_master_key_seqno_from_keyring();
   m_master_key_seqno = master_key_seqno.second;
-  DBUG_PRINT("debug", ("m_master_key_seqno=%u", m_master_key_seqno));
+  DBUG_PRINT("custom_info", ("m_master_key_seqno=%u", m_master_key_seqno));
   /* keyring error */
   if (master_key_seqno.first == Keyring_status::KEYRING_ERROR_FETCHING ||
       DBUG_EVALUATE_IF("fail_to_fetch_master_key_seqno_from_keyring", true,
@@ -215,7 +215,7 @@ bool Rpl_encryption::recover_master_key() {
     if (master_key.first == Keyring_status::KEYRING_ERROR_FETCHING) goto err1;
   }
 
-  DBUG_PRINT("debug", ("m_enabled= %s", m_enabled ? "true" : "false"));
+  DBUG_PRINT("custom_info", ("m_enabled= %s", m_enabled ? "true" : "false"));
 
   /* Retrieve old master key seqno from keyring */
   old_master_key_seqno = get_old_master_key_seqno_from_keyring();
@@ -407,15 +407,15 @@ bool Rpl_encryption::enable(THD *thd) {
   m_enabled = true;
   m_skip_logs_rotation = false;
 
-  DBUG_PRINT("debug", ("m_master_key_recovered= %s",
-                       m_master_key_recovered ? "true" : "false"));
+  DBUG_PRINT("custom_info", ("m_master_key_recovered= %s",
+                             m_master_key_recovered ? "true" : "false"));
 
   bool res = false;
   /* Recover master key if not recovered yet */
   if (!m_master_key_recovered) res = recover_master_key();
 
   if (!res) {
-    DBUG_PRINT("debug", ("m_master_key_seqno= %u", m_master_key_seqno));
+    DBUG_PRINT("custom_info", ("m_master_key_seqno= %u", m_master_key_seqno));
     DBUG_ASSERT(m_master_key_seqno > 0);
     if (!m_skip_logs_rotation) rotate_logs(thd);
   }
@@ -427,7 +427,7 @@ bool Rpl_encryption::enable(THD *thd) {
     /* Cleanup any error if we are going to enable the option */
     if (current_thd->is_error()) current_thd->clear_error();
   }
-  DBUG_PRINT("debug", ("m_enabled= %s", m_enabled ? "true" : "false"));
+  DBUG_PRINT("custom_info", ("m_enabled= %s", m_enabled ? "true" : "false"));
   return res;
 }
 
@@ -746,7 +746,7 @@ bool Rpl_encryption::set_seqno_on_keyring(std::string key_id, uint32_t seqno) {
   DBUG_TRACE;
   unsigned char key[SEQNO_KEY_LENGTH]{0};
   int4store(key, seqno);
-  DBUG_PRINT("debug", ("key_id= '%s'. seqno= %u", key_id.c_str(), seqno));
+  DBUG_PRINT("custom_info", ("key_id= '%s'. seqno= %u", key_id.c_str(), seqno));
 #ifdef DBUG_OFF
   if (my_key_store(key_id.c_str(), SEQNO_KEY_TYPE, nullptr, key,
                    SEQNO_KEY_LENGTH)) {
@@ -977,7 +977,7 @@ std::unique_ptr<Rpl_encryption_header> Rpl_encryption_header::get_header(
   std::unique_ptr<Rpl_encryption_header> header;
 
   if (read_len == VERSION_SIZE) {
-    DBUG_PRINT("debug", ("encryption header version= %d", version));
+    DBUG_PRINT("custom_info", ("encryption header version= %d", version));
     switch (version) {
       case 1: {
         std::unique_ptr<Rpl_encryption_header> header_v1(

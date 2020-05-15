@@ -1106,10 +1106,6 @@ static void buf_flush_write_block_low(buf_page_t *bpage, buf_flush_t flush_type,
   ut_ad(!mutex_own(&buf_pool->LRU_list_mutex));
 #endif /* UNIV_DEBUG */
 
-  DBUG_PRINT("ib_buf", ("flush %s %u page " UINT32PF ":" UINT32PF,
-                        sync ? "sync" : "async", (unsigned)flush_type,
-                        bpage->id.space(), bpage->id.page_no()));
-
   ut_ad(buf_page_in_file(bpage));
 
   /* We are not holding block_mutex here. Nevertheless, it is safe to
@@ -1516,9 +1512,6 @@ static ulint buf_flush_try_neighbors(const page_id_t &page_id,
   if (high > space_size) {
     high = space_size;
   }
-
-  DBUG_PRINT("ib_buf", ("flush " UINT32PF ":%u..%u", page_id.space(),
-                        (unsigned)low, (unsigned)high));
 
   for (i = low; i < high; i++) {
     buf_page_t *bpage;
@@ -1962,10 +1955,6 @@ static std::pair<ulint, ulint> buf_flush_batch(buf_pool_t *buf_pool,
     default:
       ut_error;
   }
-
-  DBUG_PRINT("ib_buf",
-             ("flush %u completed, flushed %u pages, evicted %u pages",
-              unsigned(flush_type), unsigned(res.first), unsigned(res.second)));
 
   return (res);
 }
@@ -3173,9 +3162,9 @@ static void buf_flush_page_coordinator_thread(size_t n_page_cleaners) {
       n_flushed = n_flushed_list;
 
       if (is_sync_flush) {
-        MONITOR_INC_VALUE_CUMULATIVE(
-            MONITOR_FLUSH_SYNC_TOTAL_PAGE, MONITOR_FLUSH_SYNC_COUNT,
-            MONITOR_FLUSH_SYNC_PAGES, n_flushed_list);
+        MONITOR_INC_VALUE_CUMULATIVE(MONITOR_FLUSH_SYNC_TOTAL_PAGE,
+                                     MONITOR_FLUSH_SYNC_COUNT,
+                                     MONITOR_FLUSH_SYNC_PAGES, n_flushed_list);
       } else {
         if (n_flushed_list) {
           MONITOR_INC_VALUE_CUMULATIVE(

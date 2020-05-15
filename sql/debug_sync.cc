@@ -1928,7 +1928,7 @@ void debug_sync(THD *thd, const char *sync_point_name, size_t name_len) {
   DBUG_ASSERT(sync_point_name);
   DBUG_ASSERT(name_len);
   DBUG_ASSERT(ds_control);
-  DBUG_PRINT("debug_sync_point", ("hit: '%s'", sync_point_name));
+  /* DBUG_PRINT("debug_sync_point", ("hit: '%s'", sync_point_name)); */
 
   /* Statistics. */
   ds_control->dsp_hits++;

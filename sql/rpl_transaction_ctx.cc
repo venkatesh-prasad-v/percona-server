@@ -91,13 +91,13 @@ rpl_gno Rpl_transaction_ctx::get_gno() {
 int set_transaction_ctx(
     Transaction_termination_ctx transaction_termination_ctx) {
   DBUG_TRACE;
-  DBUG_PRINT("enter", ("thread_id=%lu, rollback_transaction=%d, "
-                       "generated_gtid=%d, sidno=%d, gno=%lld",
-                       transaction_termination_ctx.m_thread_id,
-                       transaction_termination_ctx.m_rollback_transaction,
-                       transaction_termination_ctx.m_generated_gtid,
-                       transaction_termination_ctx.m_sidno,
-                       transaction_termination_ctx.m_gno));
+  DBUG_PRINT("custom_info", ("thread_id=%lu, rollback_transaction=%d, "
+                             "generated_gtid=%d, sidno=%d, gno=%lld",
+                             transaction_termination_ctx.m_thread_id,
+                             transaction_termination_ctx.m_rollback_transaction,
+                             transaction_termination_ctx.m_generated_gtid,
+                             transaction_termination_ctx.m_sidno,
+                             transaction_termination_ctx.m_gno));
 
   THD *thd = nullptr;
   uint error = ER_NO_SUCH_THREAD;

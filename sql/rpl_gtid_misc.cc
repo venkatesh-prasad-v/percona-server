@@ -138,17 +138,19 @@ enum_return_status Gtid::parse(Sid_map *sid_map, const char *text) {
           gno = gno_var;
           RETURN_OK;
         } else
-          DBUG_PRINT("info", ("expected end of string, found garbage '%.80s' "
-                              "at char %d in '%s'",
-                              s, (int)(s - text), text));
+          DBUG_PRINT("custom_info",
+                     ("expected end of string, found garbage '%.80s' "
+                      "at char %d in '%s'",
+                      s, (int)(s - text), text));
       } else
-        DBUG_PRINT("info", ("GNO was zero or invalid (%lld) at char %d in '%s'",
-                            gno_var, (int)(s - text), text));
+        DBUG_PRINT("custom_info",
+                   ("GNO was zero or invalid (%lld) at char %d in '%s'",
+                    gno_var, (int)(s - text), text));
     } else
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("missing colon at char %d in '%s'", (int)(s - text), text));
   } else
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("not a uuid at char %d in '%s'", (int)(s - text), text));
   BINLOG_ERROR(("Malformed GTID specification: %.200s", text),
                (ER_MALFORMED_GTID_SPECIFICATION, MYF(0), text));
@@ -199,29 +201,29 @@ bool Gtid::is_valid(const char *text) {
   const char *s = text;
   SKIP_WHITESPACE();
   if (!rpl_sid::is_valid(s, binary_log::Uuid::TEXT_LENGTH)) {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("not a uuid at char %d in '%s'", (int)(s - text), text));
     return false;
   }
   s += binary_log::Uuid::TEXT_LENGTH;
   SKIP_WHITESPACE();
   if (*s != ':') {
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("missing colon at char %d in '%s'", (int)(s - text), text));
     return false;
   }
   s++;
   SKIP_WHITESPACE();
   if (parse_gno(&s) <= 0) {
-    DBUG_PRINT("info", ("GNO was zero or invalid at char %d in '%s'",
-                        (int)(s - text), text));
+    DBUG_PRINT("custom_info", ("GNO was zero or invalid at char %d in '%s'",
+                               (int)(s - text), text));
     return false;
   }
   SKIP_WHITESPACE();
   if (*s != 0) {
-    DBUG_PRINT("info", ("expected end of string, found garbage '%.80s' "
-                        "at char %d in '%s'",
-                        s, (int)(s - text), text));
+    DBUG_PRINT("custom_info", ("expected end of string, found garbage '%.80s' "
+                               "at char %d in '%s'",
+                               s, (int)(s - text), text));
     return false;
   }
   return true;
@@ -248,7 +250,8 @@ void check_return_status(enum_return_status status, const char *action,
                    thd->system_thread == SYSTEM_THREAD_COMPRESS_GTID_TABLE));
 #endif
     }
-    DBUG_PRINT("info", ("%s error %d (%s)", action, status, status_name));
+    DBUG_PRINT("custom_info",
+               ("%s error %d (%s)", action, status, status_name));
   }
 }
 #endif  // ! DBUG_OFF

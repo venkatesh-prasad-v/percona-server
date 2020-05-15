@@ -761,10 +761,6 @@ scan_again:
 
     ut_ad(mutex_own(block_mutex));
 
-    DBUG_PRINT("ib_buf",
-               ("evict page " UINT32PF ":" UINT32PF " state %u",
-                bpage->id.space(), bpage->id.page_no(), bpage->state));
-
     if (buf_page_get_state(bpage) != BUF_BLOCK_FILE_PAGE) {
       /* Do nothing, because the adaptive hash index
       covers uncompressed pages only. */
@@ -1821,9 +1817,6 @@ bool buf_LRU_free_page(buf_page_t *bpage, bool zip) {
   ut_ad(buf_page_in_file(bpage));
   ut_ad(bpage->in_LRU_list);
   ut_ad(!bpage->in_flush_list == !bpage->oldest_modification);
-
-  DBUG_PRINT("ib_buf", ("free page " UINT32PF ":" UINT32PF, bpage->id.space(),
-                        bpage->id.page_no()));
 
   mutex_exit(block_mutex);
 

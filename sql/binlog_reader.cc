@@ -55,7 +55,8 @@ static void debug_corrupt_event(unsigned char *buffer, unsigned int event_len) {
                                 LOG_EVENT_MINIMAL_HEADER_LEN) +
                       LOG_EVENT_MINIMAL_HEADER_LEN;
         buffer[cor_pos] = buffer[cor_pos] + 1;
-        DBUG_PRINT("info", ("Corrupt the event on position %d", cor_pos));
+        DBUG_PRINT("custom_info",
+                   ("Corrupt the event on position %d", cor_pos));
       });
 }
 #endif  // ifdef DBUG_OFF
@@ -201,7 +202,7 @@ Binlog_read_error::Error_type binlog_event_deserialize(
   DBUG_TRACE;
 
   DBUG_ASSERT(fde != 0);
-  DBUG_PRINT("info", ("binlog_version: %d", fde->binlog_version));
+  DBUG_PRINT("custom_info", ("binlog_version: %d", fde->binlog_version));
   DBUG_DUMP("data", buffer, event_len);
 
   /* Check the integrity */

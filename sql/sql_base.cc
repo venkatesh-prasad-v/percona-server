@@ -530,7 +530,7 @@ static TABLE_SHARE *process_found_table_share(THD *thd MY_ATTRIBUTE((unused)),
       Share was not used before and it was in the old_unused_share list
       Unlink share from this list
     */
-    DBUG_PRINT("info", ("Unlinking from not used list"));
+    DBUG_PRINT("custom_info", ("Unlinking from not used list"));
     *share->prev = share->next;
     share->next->prev = share->prev;
     share->next = 0;
@@ -951,7 +951,7 @@ void release_table_share(TABLE_SHARE *share) {
       table_def_cache->erase(to_string(share->table_cache_key));
     else {
       /* Link share last in used_table_share list */
-      DBUG_PRINT("info", ("moving share to unused list"));
+      DBUG_PRINT("custom_info", ("moving share to unused list"));
 
       DBUG_ASSERT(share->next == 0);
       share->prev = end_of_unused_share.prev;
@@ -1215,7 +1215,8 @@ bool close_cached_tables(THD *thd, TABLE_LIST *tables, bool wait_for_refresh,
   }
 
   /* Wait until all threads have closed all the tables we are flushing. */
-  DBUG_PRINT("info", ("Waiting for other threads to close their open tables"));
+  DBUG_PRINT("custom_info",
+             ("Waiting for other threads to close their open tables"));
 
   while (found && !thd->killed) {
     TABLE_SHARE *share = NULL;
@@ -1389,7 +1390,7 @@ static void mark_used_tables_as_free_for_reuse(THD *thd, TABLE *table) {
 static void close_open_tables(THD *thd) {
   mysql_mutex_assert_not_owner(&LOCK_open);
 
-  DBUG_PRINT("info", ("thd->open_tables: %p", thd->open_tables));
+  DBUG_PRINT("custom_info", ("thd->open_tables: %p", thd->open_tables));
 
   while (thd->open_tables) close_thread_table(thd, &thd->open_tables);
 }
@@ -2118,7 +2119,7 @@ static TABLE_LIST *find_dup_table(const TABLE_LIST *table,
   t_name = table->table_name;
   t_alias = table->alias;
 
-  DBUG_PRINT("info", ("real table: %s.%s", d_name, t_name));
+  DBUG_PRINT("custom_info", ("real table: %s.%s", d_name, t_name));
   for (;;) {
     /*
       Table is unique if it is present only once in the global list
@@ -2152,7 +2153,7 @@ static TABLE_LIST *find_dup_table(const TABLE_LIST *table,
     */
   next:
     table_list = res->next_global;
-    DBUG_PRINT("info",
+    DBUG_PRINT("custom_info",
                ("found same copy of table or table which we should skip"));
   }
   return res;
@@ -2371,7 +2372,6 @@ void close_temporary_table(THD *thd, TABLE *table, bool free_share,
   close_temporary(thd, table, free_share, delete_table);
 
   mysql_mutex_unlock(&thd->LOCK_temporary_tables);
-
 }
 
 /*
@@ -2925,7 +2925,7 @@ bool open_table(THD *thd, TABLE_LIST *table_list, Open_table_context *ot_ctx) {
     if (best_table) {
       table = best_table;
       table->query_id = thd->query_id;
-      DBUG_PRINT("info", ("Using locked table"));
+      DBUG_PRINT("custom_info", ("Using locked table"));
       goto reset;
     }
     /*
@@ -3625,7 +3625,7 @@ void assign_new_table_id(TABLE_SHARE *share) {
                   last_table_id = (~0ULL >> 16););
 
   share->table_map_id = last_table_id++;
-  DBUG_PRINT("info", ("table_id=%llu", share->table_map_id.id()));
+  DBUG_PRINT("custom_info", ("table_id=%llu", share->table_map_id.id()));
 }
 
 /**
@@ -5051,8 +5051,8 @@ static bool open_and_process_table(THD *thd, LEX *lex, TABLE_LIST *const tables,
 
   if (error) {
     if (!ot_ctx->can_recover_from_failed_open() && safe_to_ignore_table) {
-      DBUG_PRINT("info", ("open_table: ignoring table '%s'.'%s'", tables->db,
-                          tables->alias));
+      DBUG_PRINT("custom_info", ("open_table: ignoring table '%s'.'%s'",
+                                 tables->db, tables->alias));
       error = false;
     }
     goto end;
@@ -6724,7 +6724,7 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count, uint flags) {
         and was marked as occupied during open_tables() as free for reuse.
       */
       mark_real_tables_as_free_for_reuse(first_not_own);
-      DBUG_PRINT("info", ("locked_tables_mode= LTM_PRELOCKED"));
+      DBUG_PRINT("custom_info", ("locked_tables_mode= LTM_PRELOCKED"));
       thd->enter_locked_tables_mode(LTM_PRELOCKED);
     }
   } else {
@@ -6795,7 +6795,7 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count, uint flags) {
     */
     if (thd->lex->requires_prelocking()) {
       mark_real_tables_as_free_for_reuse(first_not_own);
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("thd->locked_tables_mode= LTM_PRELOCKED_UNDER_LOCK_TABLES"));
       thd->locked_tables_mode = LTM_PRELOCKED_UNDER_LOCK_TABLES;
     }
@@ -7093,7 +7093,7 @@ bool open_temporary_table(THD *thd, TABLE_LIST *tl) {
   DBUG_ASSERT(!tl->is_view_or_derived() && !tl->schema_table);
 
   if (tl->open_type == OT_BASE_ONLY) {
-    DBUG_PRINT("info", ("skip_temporary is set"));
+    DBUG_PRINT("custom_info", ("skip_temporary is set"));
     return false;
   }
 
@@ -7140,7 +7140,7 @@ bool open_temporary_table(THD *thd, TABLE_LIST *tl) {
 
   table->init(thd, tl);
 
-  DBUG_PRINT("info", ("Using temporary table"));
+  DBUG_PRINT("custom_info", ("Using temporary table"));
   return false;
 }
 
@@ -7353,7 +7353,7 @@ static Field *find_field_in_natural_join(THD *thd, TABLE_LIST *table_ref,
     */
     if (!nj_col->table_field->fixed &&
         nj_col->table_field->fix_fields(thd, (Item **)&nj_col->table_field)) {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("column '%s' was dropped by the concurrent connection",
                   nj_col->table_field->item_name.ptr()));
       return NULL;
@@ -8178,8 +8178,8 @@ static bool mark_common_columns(THD *thd, TABLE_LIST *table_ref_1,
                                                                   : table_ref_2;
 
   DBUG_TRACE;
-  DBUG_PRINT("info", ("operand_1: %s  operand_2: %s", table_ref_1->alias,
-                      table_ref_2->alias));
+  DBUG_PRINT("custom_info", ("operand_1: %s  operand_2: %s", table_ref_1->alias,
+                             table_ref_2->alias));
 
   Prepared_stmt_arena_holder ps_arena_holder(thd);
 
@@ -8194,9 +8194,10 @@ static bool mark_common_columns(THD *thd, TABLE_LIST *table_ref_1,
     field_name_1 = nj_col_1->name();
     is_using_column_1 =
         using_fields && test_if_string_in_list(field_name_1, using_fields);
-    DBUG_PRINT("info", ("field_name_1=%s.%s",
-                        nj_col_1->table_name() ? nj_col_1->table_name() : "",
-                        field_name_1));
+    DBUG_PRINT(
+        "custom_info",
+        ("field_name_1=%s.%s",
+         nj_col_1->table_name() ? nj_col_1->table_name() : "", field_name_1));
 
     /*
       Find a field with the same name in table_ref_2.
@@ -8212,7 +8213,7 @@ static bool mark_common_columns(THD *thd, TABLE_LIST *table_ref_1,
       if (!(cur_nj_col_2 = it_2.get_or_create_column_ref(thd, leaf_2)))
         return true;
       cur_field_name_2 = cur_nj_col_2->name();
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("cur_field_name_2=%s.%s",
                   cur_nj_col_2->table_name() ? cur_nj_col_2->table_name() : "",
                   cur_field_name_2));
@@ -8229,7 +8230,8 @@ static bool mark_common_columns(THD *thd, TABLE_LIST *table_ref_1,
         by name (e.g. in SELECT list).
       */
       if (!my_strcasecmp(system_charset_info, field_name_1, cur_field_name_2)) {
-        DBUG_PRINT("info", ("match c1.is_common=%d", nj_col_1->is_common));
+        DBUG_PRINT("custom_info",
+                   ("match c1.is_common=%d", nj_col_1->is_common));
         if (cur_nj_col_2->is_common ||
             (found && (!using_fields || is_using_column_1))) {
           my_error(ER_NON_UNIQ_ERROR, MYF(0), field_name_1, thd->where);
@@ -8304,11 +8306,12 @@ static bool mark_common_columns(THD *thd, TABLE_LIST *table_ref_1,
                   eq_cond);
 
       nj_col_1->is_common = nj_col_2->is_common = true;
-      DBUG_PRINT("info", ("%s.%s and %s.%s are common",
-                          nj_col_1->table_name() ? nj_col_1->table_name() : "",
-                          nj_col_1->name(),
-                          nj_col_2->table_name() ? nj_col_2->table_name() : "",
-                          nj_col_2->name()));
+      DBUG_PRINT("custom_info",
+                 ("%s.%s and %s.%s are common",
+                  nj_col_1->table_name() ? nj_col_1->table_name() : "",
+                  nj_col_1->name(),
+                  nj_col_2->table_name() ? nj_col_2->table_name() : "",
+                  nj_col_2->name()));
 
       // Mark fields in the read set
       if (field_1) {
@@ -8776,7 +8779,8 @@ bool setup_fields(THD *thd, Ref_item_array ref_item_array, List<Item> &fields,
   else
     thd->mark_used_columns = MARK_COLUMNS_NONE;
 
-  DBUG_PRINT("info", ("thd->mark_used_columns: %d", thd->mark_used_columns));
+  DBUG_PRINT("custom_info",
+             ("thd->mark_used_columns: %d", thd->mark_used_columns));
   if (allow_sum_func)
     thd->lex->allow_sum_func |= (nesting_map)1 << select->nest_level;
   thd->where = THD::DEFAULT_WHERE;
@@ -8805,7 +8809,7 @@ bool setup_fields(THD *thd, Ref_item_array ref_item_array, List<Item> &fields,
   while ((item = it++)) {
     if ((!item->fixed && item->fix_fields(thd, it.ref())) ||
         (item = *(it.ref()))->check_cols(1)) {
-      DBUG_PRINT("info",
+      DBUG_PRINT("custom_info",
                  ("thd->mark_used_columns: %d", thd->mark_used_columns));
       return true; /* purecov: inspected */
     }
@@ -8886,7 +8890,8 @@ bool setup_fields(THD *thd, Ref_item_array ref_item_array, List<Item> &fields,
   select->is_item_list_lookup = save_is_item_list_lookup;
   thd->lex->allow_sum_func = save_allow_sum_func;
   thd->mark_used_columns = save_mark_used_columns;
-  DBUG_PRINT("info", ("thd->mark_used_columns: %d", thd->mark_used_columns));
+  DBUG_PRINT("custom_info",
+             ("thd->mark_used_columns: %d", thd->mark_used_columns));
 
   DBUG_ASSERT(!thd->is_error());
   return false;
@@ -9912,7 +9917,7 @@ bool init_ftfuncs(THD *thd, SELECT_LEX *select_lex) {
   DBUG_ASSERT(select_lex->has_ft_funcs());
 
   List_iterator<Item_func_match> li(*(select_lex->ftfunc_list));
-  DBUG_PRINT("info", ("Performing FULLTEXT search"));
+  DBUG_PRINT("custom_info", ("Performing FULLTEXT search"));
   THD_STAGE_INFO(thd, stage_fulltext_initialization);
 
   Item_func_match *ifm;
@@ -9933,8 +9938,9 @@ static bool is_cond_equal(const Item *cond) noexcept {
 }
 
 static bool is_cond_mult_equal(const Item *cond) noexcept {
-  return (cond->type() == Item::FUNC_ITEM &&
-          (((const Item_func *)cond)->functype() == Item_func::MULT_EQUAL_FUNC));
+  return (
+      cond->type() == Item::FUNC_ITEM &&
+      (((const Item_func *)cond)->functype() == Item_func::MULT_EQUAL_FUNC));
 }
 
 /*
@@ -10236,7 +10242,7 @@ void Join_node::add_const_equi_columns(Item *cond) {
   if (is_cond_or(cond)) return;
   if (is_cond_and(cond)) {
     const List<Item> *args = ((const Item_cond *)cond)->argument_list();
-    List_iterator<Item> it(*const_cast<List<Item>*>(args));
+    List_iterator<Item> it(*const_cast<List<Item> *>(args));
     Item *c;
     while ((c = it++)) add_const_equi_columns(c);
     return;

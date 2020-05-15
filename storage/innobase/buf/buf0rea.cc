@@ -93,11 +93,6 @@ ulint buf_read_page_low(dberr_t *err, bool sync, ulint type, ulint mode,
     return (0);
   }
 
-  DBUG_PRINT("ib_buf",
-             ("read page %u:%u size=%u unzip=%u,%s", (unsigned)page_id.space(),
-              (unsigned)page_id.page_no(), (unsigned)page_size.physical(),
-              (unsigned)unzip, sync ? "sync" : "async"));
-
   ut_ad(buf_page_in_file(bpage));
   ut_ad(!mutex_own(&buf_pool_from_bpage(bpage)->LRU_list_mutex));
 
@@ -269,9 +264,6 @@ read_ahead:
   os_aio_simulated_wake_handler_threads();
 
   if (count) {
-    DBUG_PRINT("ib_buf",
-               ("random read-ahead %u pages, %u:%u", (unsigned)count,
-                (unsigned)page_id.space(), (unsigned)page_id.page_no()));
   }
 
   /* Read ahead is considered one I/O operation for the purpose of
@@ -632,8 +624,6 @@ ulint buf_read_ahead_linear(const page_id_t &page_id,
   os_aio_simulated_wake_handler_threads();
 
   if (count) {
-    DBUG_PRINT("ib_buf", ("linear read-ahead %lu pages, " UINT32PF ":" UINT32PF,
-                          count, page_id.space(), page_id.page_no()));
   }
 
   /* Read ahead is considered one I/O operation for the purpose of
@@ -690,8 +680,6 @@ void buf_read_ibuf_merge_pages(bool sync, const space_id_t *space_ids,
   os_aio_simulated_wake_handler_threads();
 
   if (n_stored) {
-    DBUG_PRINT("ib_buf", ("ibuf merge read-ahead %u pages, space %u",
-                          unsigned(n_stored), unsigned(space_ids[0])));
   }
 }
 
@@ -775,6 +763,4 @@ void buf_read_recv_pages(bool sync, space_id_t space_id,
   }
 
   os_aio_simulated_wake_handler_threads();
-
-  DBUG_PRINT("ib_buf", ("recovery read-ahead (%u pages)", unsigned(n_stored)));
 }

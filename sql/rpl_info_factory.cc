@@ -1381,9 +1381,9 @@ bool Rpl_info_factory::load_channel_names_from_table(
         break;
 
       default:
-        DBUG_PRINT("info", ("Failed to get next record"
-                            " (ha_rnd_next returns %d)",
-                            error));
+        DBUG_PRINT("custom_info", ("Failed to get next record"
+                                   " (ha_rnd_next returns %d)",
+                                   error));
     }
   } while (!error);
 

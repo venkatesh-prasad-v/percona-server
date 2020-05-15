@@ -6707,13 +6707,16 @@ bool mysql_reconnect(MYSQL *mysql) {
   tmp_mysql.options = mysql->options;
   tmp_mysql.options.my_cnf_file = tmp_mysql.options.my_cnf_group = 0;
 #ifdef MYSQL_SERVER
-  MYSQL_EXTENSION_PTR(&tmp_mysql)->server_extn =
+  NET_SERVER *server_extn = MYSQL_EXTENSION_PTR(&tmp_mysql)->server_extn =
       MYSQL_EXTENSION_PTR(mysql)->server_extn;
   MYSQL_EXTENSION_PTR(mysql)->server_extn = nullptr;
 #endif
   if (!mysql_real_connect(&tmp_mysql, mysql->host, mysql->user, mysql->passwd,
                           mysql->db, mysql->port, mysql->unix_socket,
                           mysql->client_flag | CLIENT_REMEMBER_OPTIONS)) {
+#ifdef MYSQL_SERVER
+    MYSQL_EXTENSION_PTR(mysql)->server_extn = server_extn;
+#endif
     memset(&tmp_mysql.options, 0, sizeof(tmp_mysql.options));
     mysql_close(&tmp_mysql);
     mysql->net.last_errno = tmp_mysql.net.last_errno;
@@ -6722,6 +6725,9 @@ bool mysql_reconnect(MYSQL *mysql) {
     return true;
   }
   if (mysql_set_character_set(&tmp_mysql, mysql->charset->csname)) {
+#ifdef MYSQL_SERVER
+    MYSQL_EXTENSION_PTR(mysql)->server_extn = server_extn;
+#endif
     DBUG_PRINT("error", ("mysql_set_character_set() failed"));
     memset(&tmp_mysql.options, 0, sizeof(tmp_mysql.options));
     mysql_close(&tmp_mysql);
