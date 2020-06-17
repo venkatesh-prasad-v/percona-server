@@ -202,6 +202,7 @@ extern ulonglong slave_rows_search_algorithms_options;
 extern bool opt_require_secure_transport;
 
 extern bool opt_slave_preserve_commit_order;
+extern bool cp_debug;
 
 #ifndef DBUG_OFF
 extern uint slave_rows_last_search_algorithm_used;

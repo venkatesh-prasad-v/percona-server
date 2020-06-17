@@ -45,6 +45,7 @@
 #include "mysql/psi/mysql_thread.h"
 #include "mysql/thread_type.h"
 #include "sql/auth/sql_security_ctx.h"
+#include "sql/cp_log.h"
 #include "sql/current_thd.h"
 #include "sql/debug_sync.h"  // debug_sync_set_action
 #include "sql/field.h"
@@ -515,6 +516,9 @@ int Gtid_table_persistor::compress_in_single_transaction(THD *thd,
   */
   THD_STAGE_INFO(thd, stage_compressing_gtid_table);
 
+  CP_DEBUG(
+      "[Compressor] Compressor thread compressing the first consecutive range "
+      "in the table");
   if ((error = compress_first_consecutive_range(table, is_complete))) goto end;
 
 #ifndef DBUG_OFF
@@ -710,6 +714,7 @@ int Gtid_table_persistor::delete_all(TABLE *table) {
     Delete all rows in the gtid_executed table. We cannot use truncate(),
     since it is a non-transactional DDL operation.
   */
+  CP_DEBUG("[Compressor] Compressor thread deleting all rows");
   while (!(err = table->file->ha_rnd_next(table->record[0]))) {
     /* Delete current row. */
     err = table->file->ha_delete_row(table->record[0]);
@@ -746,7 +751,8 @@ static void *compress_gtid_table(void *p_thd) {
   my_thread_init();
   {
     DBUG_TRACE;
-
+    CP_DEBUG("Starting GTID compressor thread with thread id "
+             << thd->thread_id());
     init_thd(&thd);
     /*
       Gtid table compression thread should ignore 'read-only' and
@@ -769,6 +775,7 @@ static void *compress_gtid_table(void *p_thd) {
 
       THD_STAGE_INFO(thd, stage_compressing_gtid_table);
       /* Compressing the gtid_executed table. */
+      CP_DEBUG("[Compressor] Compressor thread compressing the table");
       if (gtid_state->compress(thd)) {
         LogErr(WARNING_LEVEL, ER_FAILED_TO_COMPRESS_GTID_EXECUTED_TABLE);
         /* Clear the error for going to wait for next compression signal. */
@@ -779,8 +786,12 @@ static void *compress_gtid_table(void *p_thd) {
           DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
         };);
       }
+      CP_DEBUG(
+          "[Compressor] Compressor thread completed successfully. Entering the "
+          "wait.");
     }
 
+    CP_DEBUG("[Compressor] Compressor thread exiting");
     mysql_mutex_unlock(&LOCK_compress_gtid_table);
     thd->reset_skip_readonly_check();
     deinit_thd(thd);

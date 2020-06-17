@@ -79,6 +79,7 @@
 #include "sql/binlog.h"            // mysql_bin_log
 #include "sql/check_stack.h"
 #include "sql/clone_handler.h"
+#include "sql/cp_log.h"
 #include "sql/current_thd.h"
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/dd.h"                       // dd::get_dictionary
@@ -1582,8 +1583,18 @@ std::pair<int, bool> commit_owned_gtids(THD *thd, bool all) {
       If GTID is not persisted by SE, write it to
       mysql.gtid_executed table.
     */
-    if (thd->owned_gtid.sidno > 0 && !thd->se_persists_gtid()) {
-      error = gtid_state->save(thd);
+    bool se_persists_gtid = thd->se_persists_gtid();
+    if (thd->owned_gtid.sidno > 0) {
+      CP_DEBUG("In commit_owned_gtids GTID:{"
+               << thd->owned_gtid.sidno << "," << thd->owned_gtid.gno
+               << "}. thd->se_persists_gtid() = " << se_persists_gtid << ".");
+      if (!se_persists_gtid) {
+        CP_DEBUG(
+            "In commit_owned_gtids. SE doesn't persist GTID, so saving GTID:{"
+            << thd->owned_gtid.sidno << "," << thd->owned_gtid.gno
+            << "} to table.");
+        error = gtid_state->save(thd);
+      }
     }
   }
 
@@ -1596,8 +1607,8 @@ std::pair<int, bool> commit_owned_gtids(THD *thd, bool all) {
                                        otherwise.
   @param[in] ignore_global_read_lock   Allow commit to complete even if a
                                        global read lock is active. This can be
-                                       used to allow changes to internal tables
-                                       (e.g. slave status tables).
+                                       used to allow changes to internal
+  tables (e.g. slave status tables).
 
   @retval
     0   ok
@@ -1721,8 +1732,8 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
     DBUG_EXECUTE_IF("crash_commit_before", DBUG_SUICIDE(););
 
     /*
-     skip 2PC if the transaction is empty and it is not marked as started (which
-     can happen when the slave's binlog is disabled)
+     skip 2PC if the transaction is empty and it is not marked as started
+     (which can happen when the slave's binlog is disabled)
     */
     if (ha_info->is_started())
       rw_ha_count = ha_check_and_coalesce_trx_read_only(thd, ha_info, all);
@@ -1810,7 +1821,8 @@ end:
     DBUG_PRINT("debug", ("Releasing MDL commit lock"));
     thd->mdl_context.release_lock(mdl_request.ticket);
   }
-  /* Free resources and perform other cleanup even for 'empty' transactions. */
+  /* Free resources and perform other cleanup even for 'empty' transactions.
+   */
   if (is_real_trans) {
     trn_ctx->cleanup();
     thd->tx_priority = 0;
@@ -1991,7 +2003,8 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
   }
 
 err:
-  /* Free resources and perform other cleanup even for 'empty' transactions. */
+  /* Free resources and perform other cleanup even for 'empty' transactions.
+   */
   if (all) trn_ctx->cleanup();
   /*
     When the transaction has been committed, we clear the commit_low
@@ -2066,10 +2079,10 @@ int ha_rollback_low(THD *thd, bool all) {
       DBUG_ASSERT(m_status == DA_ERROR)
     in the method Diagnostics_area::mysql_errno().
 
-    In case ha_xa_prepare is failed and an error wasn't set in Diagnostics_area
-    the error ER_XA_RBROLLBACK is set in the Diagnostics_area from
-    the method Sql_cmd_xa_prepare::trans_xa_prepare() when non-zero result code
-    returned by ha_xa_prepare() is handled.
+    In case ha_xa_prepare is failed and an error wasn't set in
+    Diagnostics_area the error ER_XA_RBROLLBACK is set in the Diagnostics_area
+    from the method Sql_cmd_xa_prepare::trans_xa_prepare() when non-zero
+    result code returned by ha_xa_prepare() is handled.
   */
   if (all && thd->transaction_rollback_request && thd->is_error())
     trn_ctx->xid_state()->set_error(thd);
@@ -2228,7 +2241,8 @@ int ha_commit_attachable(THD *thd) {
   }
 #endif
 
-  /* Free resources and perform other cleanup even for 'empty' transactions. */
+  /* Free resources and perform other cleanup even for 'empty' transactions.
+   */
   trn_ctx->cleanup();
 
   return (error);
@@ -2985,16 +2999,17 @@ int handler::ha_open(TABLE *table_arg, const char *name, int mode,
       table->db_stat |= HA_READ_ONLY;
     (void)extra(HA_EXTRA_NO_READCHECK);  // Not needed in SQL
 
-    /* ref is already allocated for us if we're called from handler::clone() */
+    /* ref is already allocated for us if we're called from handler::clone()
+     */
     if (!ref && !(ref = (uchar *)mem_root->Alloc(ALIGN_SIZE(ref_length) * 2))) {
       ha_close();
       error = HA_ERR_OUT_OF_MEM;
     } else
       dup_ref = ref + ALIGN_SIZE(ref_length);
 
-    // Give the table a defined starting cursor, even if it never actually seeks
-    // or writes. This is important for things like weedout on const tables
-    // (which is a nonsensical combination, but can happen).
+    // Give the table a defined starting cursor, even if it never actually
+    // seeks or writes. This is important for things like weedout on const
+    // tables (which is a nonsensical combination, but can happen).
     memset(ref, 0, ref_length);
     cached_table_flags = table_flags();
   }
@@ -4777,8 +4792,8 @@ int check_table_for_old_types(const TABLE *table, bool check_temporal_upgrade) {
     /*
       Check for old DECIMAL field.
 
-      Above check does not take into account for pre 5.0 decimal types which can
-      be present in the data directory if user did in-place upgrade from
+      Above check does not take into account for pre 5.0 decimal types which
+      can be present in the data directory if user did in-place upgrade from
       mysql-4.1 to mysql-5.0.
     */
     if ((*field)->type() == MYSQL_TYPE_DECIMAL) {
@@ -5276,8 +5291,8 @@ int handler::ha_create(const char *name, TABLE *form, HA_CREATE_INFO *info,
 /**
  * Prepares the secondary engine for table load.
  *
- * @param table The table to load into the secondary engine. Its read_set tells
- * which columns to load.
+ * @param table The table to load into the secondary engine. Its read_set
+ * tells which columns to load.
  *
  * @sa handler::prepare_load_table()
  */
@@ -5288,15 +5303,16 @@ int handler::ha_prepare_load_table(const TABLE &table) {
 /**
  * Loads a table into its defined secondary storage engine: public interface.
  *
- * @param table The table to load into the secondary engine. Its read_set tells
- * which columns to load.
+ * @param table The table to load into the secondary engine. Its read_set
+ * tells which columns to load.
  *
  * @sa handler::load_table()
  */
 int handler::ha_load_table(const TABLE &table) { return load_table(table); }
 
 /**
- * Unloads a table from its defined secondary storage engine: public interface.
+ * Unloads a table from its defined secondary storage engine: public
+ * interface.
  *
  * @sa handler::unload_table()
  */
@@ -5506,7 +5522,8 @@ int ha_create_table(THD *thd, const char *path, const char *db,
   share.m_psi = PSI_TABLE_CALL(get_table_share)(temp_table, &share);
 #endif
 
-  // When db_stat is 0, we can pass nullptr as dd::Table since it won't be used.
+  // When db_stat is 0, we can pass nullptr as dd::Table since it won't be
+  // used.
   destroy(&table);
   if (open_table_from_share(thd, &share, "", 0, (uint)READ_ALL, 0, &table, true,
                             nullptr)) {
@@ -5616,7 +5633,8 @@ int ha_create_table_from_engine(THD *thd, const char *db, const char *name) {
   if (open_table_def(thd, &share, *table_def)) return 3;
 
   TABLE table;
-  // When db_stat is 0, we can pass nullptr as dd::Table since it won't be used.
+  // When db_stat is 0, we can pass nullptr as dd::Table since it won't be
+  // used.
   if (open_table_from_share(thd, &share, "", 0, 0, 0, &table, false, nullptr)) {
     free_table_share(&share);
     return 3;
@@ -6475,8 +6493,8 @@ static bool key_uses_partial_cols(TABLE *table, uint keyno) {
   @param n_ranges_arg    Number of ranges in the sequence, or 0 if the caller
                          can't efficiently determine it
   @param [in,out] bufsz  IN:  Size of the buffer available for use
-                         OUT: Size of the buffer that is expected to be actually
-                              used, or 0 if buffer is not needed.
+                         OUT: Size of the buffer that is expected to be
+  actually used, or 0 if buffer is not needed.
   @param [in,out] flags  A combination of HA_MRR_* flags
   @param [out] cost      Estimated cost of MRR access
 
@@ -6612,11 +6630,11 @@ ha_rows handler::multi_range_read_info_const(
   @param keyno           Index number
   @param n_ranges        Estimated number of ranges (i.e. intervals) in the
                          range sequence.
-  @param n_rows          Estimated total number of records contained within all
-                         of the ranges
+  @param n_rows          Estimated total number of records contained within
+  all of the ranges
   @param [in,out] bufsz  IN:  Size of the buffer available for use
-                         OUT: Size of the buffer that will be actually used, or
-                              0 if buffer is not needed.
+                         OUT: Size of the buffer that will be actually used,
+  or 0 if buffer is not needed.
   @param [in,out] flags  A combination of HA_MRR_* flags
   @param [out] cost      Estimated cost of MRR access
 
@@ -6678,9 +6696,9 @@ ha_rows handler::multi_range_read_info(uint keyno, uint n_ranges, uint n_rows,
     the members of HANDLER_BUFFER structure.
     The callee consumes all or some fraction of the provided buffer space, and
     sets the HANDLER_BUFFER members accordingly.
-    The callee may use the buffer memory until the next multi_range_read_init()
-    call is made, all records have been read, or until index_end() call is
-    made, whichever comes first.
+    The callee may use the buffer memory until the next
+  multi_range_read_init() call is made, all records have been read, or until
+  index_end() call is made, whichever comes first.
 
   @retval 0  OK
   @retval 1  Error
@@ -6721,8 +6739,8 @@ int handler::ha_multi_range_read_next(char **range_info) {
   Default MRR implementation: read the next record
 
   @param range_info  OUT  Undefined if HA_MRR_NO_ASSOCIATION flag is in effect
-                          Otherwise, the opaque value associated with the range
-                          that contains the returned record.
+                          Otherwise, the opaque value associated with the
+  range that contains the returned record.
 
   @retval 0      OK
   @retval other  Error code
@@ -6852,7 +6870,8 @@ int DsMrr_impl::dsmrr_init(RANGE_SEQ_IF *seq_funcs, void *seq_init_param,
       1. We have not pushed an index conditon on this handler.
       2. We have pushed an index condition and this is on the currently used
          index.
-      3. We have pushed an index condition but this is not for the primary key.
+      3. We have pushed an index condition but this is not for the primary
+    key.
       4. We have pushed an index condition and this has been transferred to
          the clone (h2) of the handler object.
   */
@@ -7064,7 +7083,8 @@ int DsMrr_impl::dsmrr_fill_buffer() {
   rowids_buf_cur = rowids_buf;
   /*
     Do not use ha_multi_range_read_next() as it would call the engine's
-    overridden multi_range_read_next() but the default implementation is wanted.
+    overridden multi_range_read_next() but the default implementation is
+    wanted.
   */
   while ((rowids_buf_cur < rowids_buf_end) &&
          !(res = h2->handler::multi_range_read_next(&range_info))) {
@@ -7124,7 +7144,8 @@ int DsMrr_impl::dsmrr_next(char **range_info) {
       if (res) goto end;
     }
 
-    /* return eof if there are no rowids in the buffer after re-fill attempt */
+    /* return eof if there are no rowids in the buffer after re-fill attempt
+     */
     if (rowids_buf_cur == rowids_buf_last) {
       res = HA_ERR_END_OF_FILE;
       goto end;
@@ -7819,8 +7840,8 @@ int handler::compare_key_in_buffer(const uchar *buf) const {
                                        !m_record_buffer->is_out_of_range()));
 
   /*
-    End range on descending scans is only checked with ICP for now, and then we
-    check it with compare_key_icp() instead of this function.
+    End range on descending scans is only checked with ICP for now, and then
+    we check it with compare_key_icp() instead of this function.
   */
   DBUG_ASSERT(range_scan_direction == RANGE_SCAN_ASC);
 
@@ -8230,8 +8251,7 @@ int handler::ha_write_row(uchar *buf) {
 
   DBUG_TRACE;
   DEBUG_SYNC(ha_thd(), "start_ha_write_row");
-  DBUG_EXECUTE_IF("inject_error_ha_write_row",
-                  return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
   mark_trx_read_write();
@@ -8423,7 +8443,8 @@ struct blob_len_ptr {
   engine. Here, we have to extract the space pointer and length from the
   record buffer.
   After we get the value of virtual generated columns, copy the data into
-  the specified space and store it in the record buffer (@see copy_blob_data()).
+  the specified space and store it in the record buffer (@see
+  copy_blob_data()).
 
   @param table                    the pointer of table
   @param fields                   bitmap of field index of evaluated
@@ -8465,11 +8486,12 @@ static void extract_blob_space_and_length_from_record_buff(
   by storage engine.
 
   This is because the table is closed after evaluating the value. In order to
-  keep the BLOB value after the table is closed, we have to copy the value into
-  the place where storage engine prepares for.
+  keep the BLOB value after the table is closed, we have to copy the value
+  into the place where storage engine prepares for.
 
   @param table              pointer of the table to be operated on
-  @param fields             bitmap of field index of evaluated generated column
+  @param fields             bitmap of field index of evaluated generated
+  column
   @param blob_len_ptr_array array of length and pointer of allocated space by
                             storage engine.
 */
@@ -8712,8 +8734,8 @@ bool handler::my_prepare_gcolumn_template(THD *thd, const char *db_name,
     if (thd->dd_client()->acquire(db_name, table_name, &tab_obj)) return true;
     DBUG_ASSERT(tab_obj);
 
-    // Note! The second-to-last argument to open_table_uncached() must be false,
-    // since the table already exists in the TDC. Allowing the table to
+    // Note! The second-to-last argument to open_table_uncached() must be
+    // false, since the table already exists in the TDC. Allowing the table to
     // be opened in the SE in this case is dangerous as the two shares
     // could get conflicting SE private data.
     table = open_table_uncached(thd, path, db_name, table_name, false, false,
@@ -9064,8 +9086,8 @@ std::string table_definition(const char *table_name, const TABLE *mysql_table) {
 }
 
 #ifndef DBUG_OFF
-/** Convert a binary buffer to a raw string, replacing non-printable characters
- * with a dot.
+/** Convert a binary buffer to a raw string, replacing non-printable
+ * characters with a dot.
  * @param[in] buf buffer to convert
  * @param[in] buf_size_bytes length of the buffer in bytes
  * @return a printable string, e.g. "ab.d." for an input 0x61620064FF */
@@ -9100,9 +9122,11 @@ static std::string buf_to_hex(const uchar *buf, uint buf_size_bytes) {
 }
 
 std::string row_to_string(const uchar *mysql_row, TABLE *mysql_table) {
-  /* MySQL can either use handler::table->record[0] or handler::table->record[1]
-   * for buffers to store rows. We need each field in mysql_table->field[] to
-   * point inside the buffer which was used (either record[0] or record[1]). */
+  /* MySQL can either use handler::table->record[0] or
+   * handler::table->record[1] for buffers to store rows. We need each field
+   * in mysql_table->field[] to
+   * point inside the buffer which was used (either record[0] or record[1]).
+   */
 
   uchar *buf0 = mysql_table->record[0];
   uchar *buf1 = mysql_table->record[1];
@@ -9143,15 +9167,15 @@ std::string row_to_string(const uchar *mysql_row, TABLE *mysql_table) {
   bool skip_raw_and_hex = false;
 
 #ifdef HAVE_VALGRIND
-  /* It is expected that here not all bits in (mysql_row, mysql_row_length) are
-   * initialized. For example in the first byte (the null-byte) we only set
-   * the bits of the corresponding columns to 0 or 1 (is null). And leave the
-   * remaining bits uninitialized for performance reasons. Thus Valgrind is
-   * right to complain below when we print everything. We do not want to
+  /* It is expected that here not all bits in (mysql_row, mysql_row_length)
+   * are initialized. For example in the first byte (the null-byte) we only
+   * set the bits of the corresponding columns to 0 or 1 (is null). And leave
+   * the remaining bits uninitialized for performance reasons. Thus Valgrind
+   * is right to complain below when we print everything. We do not want to
    * memset() everything, so that Valgrind does not complain here and we do
-   * not want to MEM_DEFINED_IF_ADDRESSABLE(mysql_row, mysql_row_length) either
-   * because that would silence Valgrind in other possible places where the
-   * uninitialized bits should not be read. In other words - we want the
+   * not want to MEM_DEFINED_IF_ADDRESSABLE(mysql_row, mysql_row_length)
+   * either because that would silence Valgrind in other possible places where
+   * the uninitialized bits should not be read. In other words - we want the
    * Valgrind warnings if somebody tries to use the uninitialized bits,
    * except here in this function. */
   uchar *mysql_row_copy = static_cast<uchar *>(malloc(mysql_row_length));

@@ -35,6 +35,7 @@
 #include "mysqld_error.h"
 #include "prealloced_array.h"
 #include "sql/binlog.h"
+#include "sql/cp_log.h"
 #include "sql/current_thd.h"
 #include "sql/debug_sync.h"  // DEBUG_SYNC
 #include "sql/mdl.h"
@@ -869,9 +870,16 @@ void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
       SQL thread or slave worker thread adds transaction owned GTID
       into global executed_gtids, lost_gtids and gtids_only_in_table.
     */
+    CP_DEBUG("In update_on_commit Adding {"
+             << thd->owned_gtid.sidno << "," << thd->owned_gtid.gno
+             << "} to the global executed GTID set.");
     executed_gtids._add_gtid(thd->owned_gtid);
     thd->rpl_thd_ctx.session_gtids_ctx().notify_after_gtid_executed_update(thd);
     if (thd->slave_thread && opt_bin_log && !opt_log_slave_updates) {
+      CP_DEBUG(
+          "Binlog is enabled and log_slave_updates is disabled, so adding "
+          "transaction owned GTID into global executed_gtids, lost_gtids and "
+          "gtids_only_in_table");
       lost_gtids._add_gtid(thd->owned_gtid);
       gtids_only_in_table._add_gtid(thd->owned_gtid);
     }

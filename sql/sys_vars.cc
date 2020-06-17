@@ -7288,3 +7288,10 @@ static Sys_var_bool Sys_var_require_row_format(
     "and DDLs with the exception of temporary table creation/deletion.",
     SESSION_ONLY(require_row_format), NO_CMD_LINE, DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_set_require_row_format));
+
+static Sys_var_bool Sys_cp_debug("cp_debug",
+                                 "When it is enabled, it writes debug info of "
+                                 "the clone persister thread to stderr.",
+                                 GLOBAL_VAR(cp_debug), CMD_LINE(OPT_ARG),
+                                 DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                 ON_CHECK(0), ON_UPDATE(0));

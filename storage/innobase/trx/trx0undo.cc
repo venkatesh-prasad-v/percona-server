@@ -660,6 +660,7 @@ void trx_undo_gtid_read_and_persist(trx_ulogf_t *undo_header) {
          TRX_UNDO_LOG_GTID_LEN);
   /* Mark GTID valid. */
   gtid_desc.m_is_set = true;
+  CP_DEBUG("Read "<<const_cast<uchar *>(&gtid_desc.m_info[0]) << " from the undo log. Updatig the persister list.");
 
   /* Get GTID persister */
   auto &gtid_persistor = clone_sys->get_gtid_persistor();
@@ -697,6 +698,8 @@ void trx_undo_gtid_write(trx_t *trx, trx_ulogf_t *undo_header, trx_undo_t *undo,
                      gtid_desc.m_version, MLOG_1BYTE, mtr);
     /* Persist fixed length GTID */
     ut_ad(TRX_UNDO_LOG_GTID_LEN == GTID_INFO_SIZE);
+    CP_DEBUG("Writing GTID " << const_cast<uchar *>(&gtid_desc.m_info[0])
+                             << " in the undo log header.");
     mlog_write_string(undo_header + TRX_UNDO_LOG_GTID, &gtid_desc.m_info[0],
                       TRX_UNDO_LOG_GTID_LEN, mtr);
     undo->flag |= TRX_UNDO_FLAG_GTID;

@@ -43,10 +43,12 @@ THD *thd_get_current_thd();
 void Clone_persist_gtid::add(const Gtid_desc &gtid_desc) {
   /* Check if valid descriptor. */
   if (!gtid_desc.m_is_set) {
+    CP_DEBUG("Invalid Descriptor in " << __func__);
     return;
   }
   /* Check if GTID persistence is active. */
   if (!is_active() || gtid_table_persistor == nullptr) {
+    CP_DEBUG("Persister is not active in " << __func__);
     return;
   }
   ut_ad(trx_sys_mutex_own());
@@ -57,9 +59,12 @@ void Clone_persist_gtid::add(const Gtid_desc &gtid_desc) {
   current_gtids.push_back(gtid_desc.m_info);
   /* Atomic increment. */
   int current_value = ++m_num_gtid_mem;
+  CP_DEBUG("Added " << const_cast<uchar *>(&gtid_desc.m_info[0])
+                    << " to the current GTID list. New size:" << current_value);
 
   /* Wake up background if GTIDs crossed threshold. */
   if (current_value == s_gtid_threshold) {
+    CP_DEBUG("GTIDs crossed threshold, waiting for the background thread.");
     os_event_set(m_event);
   }
 }
@@ -131,6 +136,7 @@ void Clone_persist_gtid::set_persist_gtid(trx_t *trx, bool set) {
 
   /* Set or Reset GTID persist flag in THD session. The transaction flag
   is set later during prepare/commit/rollback. */
+  CP_DEBUG("Marking thd->m_se_gtid_flags for this thread.");
   thd->set_gtid_persisted_by_se();
 }
 
@@ -355,6 +361,7 @@ int Clone_persist_gtid::write_to_table(uint64_t flush_list_number,
   /* Extract GTIDs from flush list. */
   for (auto &gtid_info : flush_list) {
     auto gtid_str = reinterpret_cast<const char *>(&gtid_info[0]);
+    CP_DEBUG("Adding " << gtid_str << " to the write set.");
     auto status = write_gtid_set.add_gtid_text(gtid_str);
     if (status != RETURN_STATUS_OK) {
       err = ER_INTERNAL_ERROR;
@@ -383,7 +390,16 @@ int Clone_persist_gtid::write_to_table(uint64_t flush_list_number,
   /* Write GTIDs to table. */
   if (!write_gtid_set.is_empty()) {
     ++m_compression_counter;
+    char *writeset_str = nullptr, *gtid_set_string = nullptr;
+    write_gtid_set.to_string(&writeset_str);
+    CP_DEBUG("Calling GTP to save the write set " << writeset_str);
     err = gtid_table_persistor->save(&write_gtid_set, false);
+    global_sid_lock->wrlock();
+    const Gtid_set *executed_gtids = gtid_state->get_executed_gtids();
+    executed_gtids->to_string(&gtid_set_string);
+    global_sid_lock->unlock();
+    CP_DEBUG(
+        "After saving to the GTP, the global GTID set:" << gtid_set_string);
   }
 
   /* Clear flush list and return */
@@ -418,6 +434,7 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
   /* During recovery, fetch existing GTIDs from gtid_executed table. */
   bool is_recovery = !m_thread_active.load();
   if (is_recovery && !opt_initialize) {
+    CP_DEBUG("In recovery, fetching GTIDs form the table. " << __func__);
     gtid_table_persistor->fetch_gtids(&table_gtid_set);
   }
 
@@ -435,6 +452,7 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     auto flush_list_number = switch_active_list();
     /* Exit trx mutex during write to table. */
     trx_sys_mutex_exit();
+    CP_DEBUG("Flushing the GTID set to table.");
     err = write_to_table(flush_list_number, table_gtid_set, sid_map);
     m_flush_in_progress.store(false);
     /* Compress always after recovery, if GTIDs are added. */
@@ -491,6 +509,8 @@ void Clone_persist_gtid::periodic_write() {
 
   m_thread_id = thd_get_thread_id(thd);
 
+  CP_DEBUG("Clone Persister thread started with thread id:"
+           << m_thread_id << ", writing all accumulated GTIDs while starting.");
   /* Allow GTID to be persisted on read only server. */
   thd->set_skip_readonly_check();
 

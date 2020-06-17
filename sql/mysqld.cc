@@ -1155,6 +1155,7 @@ ulong opt_mts_slave_parallel_workers;
 ulonglong opt_mts_pending_jobs_size_max;
 ulonglong slave_rows_search_algorithms_options;
 bool opt_slave_preserve_commit_order;
+bool cp_debug;
 #ifndef DBUG_OFF
 uint slave_rows_last_search_algorithm_used;
 #endif

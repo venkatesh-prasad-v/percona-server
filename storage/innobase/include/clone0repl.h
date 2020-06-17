@@ -35,11 +35,14 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <vector>
 #include "clone0monitor.h"
 #include "os0thread-create.h"
+#include "sql/cp_log.h"
 #include "sql/rpl_gtid.h"
+#include "sql/sql_class.h"
 #include "srv0srv.h"
 #include "srv0start.h"
 #include "trx0sys.h"
 
+class THD;
 class Clone_persist_gtid;
 
 /** Serialized GTID information size */
@@ -296,6 +299,10 @@ class Clone_persist_gtid {
     uint64_t flush_number = m_active_number;
     ++m_active_number;
     m_compression_gtid_counter += m_num_gtid_mem;
+    CP_DEBUG("Switching active list. flush_number="
+             << flush_number
+             << ", m_compression_gtid_counter=" << m_compression_gtid_counter
+             << " old m_num_gtid_mem =" << m_num_gtid_mem);
     m_num_gtid_mem.store(0);
 #ifdef UNIV_DEBUG
     /* The new active list must have no elements. */
