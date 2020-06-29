@@ -366,10 +366,7 @@ end:
     uint32 count = (uint32)m_atomic_count++;
     if (count == gtid_executed_compression_period ||
         DBUG_EVALUATE_IF("compress_gtid_table", 1, 0)) {
-      mysql_mutex_lock(&LOCK_compress_gtid_table);
-      should_compress = true;
-      mysql_cond_signal(&COND_compress_gtid_table);
-      mysql_mutex_unlock(&LOCK_compress_gtid_table);
+      set_compression_and_signal_persister();
     }
   }
 
@@ -406,10 +403,7 @@ end:
   /* Notify compression thread to compress gtid_executed table. */
   if (error == 0 && compress &&
       DBUG_EVALUATE_IF("dont_compress_gtid_table", 0, 1)) {
-    mysql_mutex_lock(&LOCK_compress_gtid_table);
-    should_compress = true;
-    mysql_cond_signal(&COND_compress_gtid_table);
-    mysql_mutex_unlock(&LOCK_compress_gtid_table);
+    set_compression_and_signal_persister();
   }
 
   return ret;
@@ -863,4 +857,11 @@ void terminate_compress_gtid_table_thread() {
   if (error != 0)
     LogErr(WARNING_LEVEL, ER_FAILED_TO_JOIN_GTID_TABLE_COMPRESSION_THREAD,
            error);
+}
+
+void Gtid_table_persistor::set_compression_and_signal_persister() {
+  mysql_mutex_lock(&LOCK_compress_gtid_table);
+  should_compress = true;
+  mysql_cond_signal(&COND_compress_gtid_table);
+  mysql_mutex_unlock(&LOCK_compress_gtid_table);
 }

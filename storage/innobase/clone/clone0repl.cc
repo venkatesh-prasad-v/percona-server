@@ -31,6 +31,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "clone0repl.h"
 #include "clone0api.h"
 #include "clone0clone.h"
+#include "debug_sync.h"
 #include "sql/field.h"
 #include "sql/mysqld.h"
 #include "sql/rpl_gtid_persist.h"
@@ -455,11 +456,6 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     CP_DEBUG("Flushing the GTID set to table.");
     err = write_to_table(flush_list_number, table_gtid_set, sid_map);
     m_flush_in_progress.store(false);
-    /* Compress always after recovery, if GTIDs are added. */
-    if (!m_thread_active.load()) {
-      compress_recovery = true;
-      ib::info(ER_IB_CLONE_GTID_PERSIST) << "GTID compression after recovery. ";
-    }
   } else {
     trx_sys_mutex_exit();
   }
@@ -477,6 +473,10 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     clone operation. */
     clone_update_gtid_status(all_gtids);
     my_free(gtid_buffer);
+
+    /* Compress always if in recovery. */
+    compress_recovery = true;
+    ib::info(ER_IB_CLONE_GTID_PERSIST) << "GTID compression after recovery. ";
   }
 
   /* Update trx number upto which GTID is written to table. */
@@ -489,7 +489,14 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     m_compression_gtid_counter = 0;
     /* Write non-innodb GTIDs before compression. */
     write_other_gtids();
-    err = gtid_table_persistor->compress(thd);
+    DBUG_EXECUTE_IF("halt_gtid_persister",
+                    {
+                      const char action[]="now SIGNAL before_compress WAIT_FOR go_ahead";
+                      DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                       STRING_WITH_LEN(action)));
+                    };);
+
+    gtid_table_persistor->set_compression_and_signal_persister();
   }
   if (err != 0) {
     ib::error(ER_IB_CLONE_GTID_PERSIST) << "Error persisting GTIDs to table";
