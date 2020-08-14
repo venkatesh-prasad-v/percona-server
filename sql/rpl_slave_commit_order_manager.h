@@ -83,6 +83,20 @@ public:
   }
 
   void report_deadlock(Slave_worker *worker);
+
+  /**
+    Reset the worker's status.
+  */
+  inline void reset_worker_status(Slave_worker *worker)
+  {
+    m_workers[worker->id].status= OCS_WAIT;
+  }
+
+  /**
+    Check if the worker should exit from the wait.
+  */
+  bool worker_should_exit(Slave_worker *worker);
+
 private:
   enum order_commit_status
   {

@@ -91,6 +91,13 @@ bool Commit_order_manager::wait_for_its_turn(Slave_worker *worker,
         DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
       }
     });
+    DBUG_EXECUTE_IF("delay_slave_worker_3", {
+      if (worker->id == 2)
+      {
+        static const char act[]= "now SIGNAL signal.w3.wait_for_its_turn WAIT_FOR go_ahead_w3";
+        DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+      }
+    });
 
     mysql_mutex_lock(&m_mutex);
     thd->ENTER_COND(cond, &m_mutex,
@@ -99,7 +106,7 @@ bool Commit_order_manager::wait_for_its_turn(Slave_worker *worker,
 
     while (queue_front() != worker->id)
     {
-      if (unlikely(worker->found_order_commit_deadlock()))
+      if (unlikely(worker_should_exit(worker)))
       {
         mysql_mutex_unlock(&m_mutex);
         thd->EXIT_COND(&old_stage);
@@ -179,3 +186,17 @@ void Commit_order_manager::report_deadlock(Slave_worker *worker)
   DBUG_VOID_RETURN;
 }
 
+bool Commit_order_manager::worker_should_exit(Slave_worker *worker)
+{
+  bool should_exit= false;
+  if (worker->found_order_commit_deadlock()) {
+    THD *thd= worker->info_thd;
+    bool is_error_non_temporary= thd->is_error() && !worker->has_temporary_error(thd);
+
+    should_exit= (m_workers[worker->id].status == OCS_WAIT &&
+                  worker->running_status == Slave_worker::RUNNING) ||
+                 (worker->running_status == Slave_worker::ERROR_LEAVING &&
+                  is_error_non_temporary);
+  }
+  return should_exit;
+}

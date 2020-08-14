@@ -2077,6 +2077,11 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
 
     cleanup_context(thd, 1);
     reset_order_commit_deadlock();
+    if (has_commit_order_manager(thd))
+    {
+      Commit_order_manager *mngr= get_commit_order_manager();
+      mngr->reset_worker_status(this);
+    }
     worker_sleep(min<ulong>(trans_retries, MAX_SLAVE_RETRY_PAUSE));
 
   } while (read_and_apply_events(start_relay_number, start_relay_pos,
