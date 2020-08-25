@@ -31,6 +31,7 @@
 #ifndef MYSQL_CLIENT
 #include "debug_sync.h"        // debug_sync_set_action
 #include "my_dir.h"            // my_dir
+#include "my_debug.h"            // my_dir
 #include "log.h"               // Log_throttle
 #include "rpl_mts_submode.h"   // Mts_submode
 #include "rpl_rli.h"           // Relay_log_info
@@ -7502,11 +7503,16 @@ int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w)
                   sql_print_information("Crashing crash_after_update_pos_before_apply.");
                   DBUG_SUICIDE(););
 
+  MY_D("Worker "<< w->id + 1<<" is trying to commit the transaction");
   error= do_commit(thd);
+  MY_D("Worker "<< w->id + 1<<" returned from commit: error: "<< error);
   if (error)
   {
     if (!skipped_commit_pos)
+    {
+      MY_D("Worker "<< w->id + 1<<" is rolling back positions");
       w->rollback_positions(ptr_group);
+    }
   }
   else if (skipped_commit_pos)
     error= w->commit_positions(this, ptr_group,

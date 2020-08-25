@@ -22,6 +22,7 @@
 
 #include "debug_sync.h"
 #include "rpl_rli_pdb.h"
+#include "my_debug.h"
 
 #include "log.h"                            // sql_print_error
 #include "rpl_slave_commit_order_manager.h" // Commit_order_manager
@@ -1246,7 +1247,10 @@ void Slave_worker::slave_worker_ends_group(Log_event* ev, int error)
       but it should rarely happen.
     */
     if (get_commit_order_manager())
+    {
       get_commit_order_manager()->report_commit(this);
+      MY_D("Worker "<<this->id +1 <<" inside slave_worker_ends_group, error = "<<error<<" reporting commit.");
+    }
 
     // first ever group must have relay log name
     DBUG_ASSERT(last_group_done_index != c_rli->gaq->size ||
@@ -1274,6 +1278,10 @@ void Slave_worker::slave_worker_ends_group(Log_event* ev, int error)
   }
   else
   {
+    MY_D("Worker "<< this->id + 1<<" running_status:"<< running_status << std::endl <<
+         " Legend: RUNNING= 1, ERROR_LEAVING= 2(is set by Worker), "
+         "STOP= 3(is set by Coordinator upon reciving STOP), "
+         "STOP_ACCEPTED= 4(is set by worker upon completing job when STOP SLAVE is issued)");
     if (running_status != STOP_ACCEPTED)
     {
       // tagging as exiting so Coordinator won't be able synchronize with it
@@ -1283,12 +1291,27 @@ void Slave_worker::slave_worker_ends_group(Log_event* ev, int error)
 
       /* Fatal error happens, it notifies the following transaction to rollback */
       if (get_commit_order_manager())
+      {
+        if (found_order_commit_deadlock()) {
+          MY_D("Worker " << this->id +1 <<" calling cleanup_context and resetting order_commit_deadlock()");
+          cleanup_context(info_thd, true);
+          reset_order_commit_deadlock();
+        }
+        MY_D("Worker "<<this->id +1 <<" inside slave_worker_ends_group, before reporting rollback.");
+        get_commit_order_manager()->print_queue_status();
         get_commit_order_manager()->report_rollback(this);
+        MY_D("Worker "<<this->id +1 <<" inside slave_worker_ends_group, after reporting rollback.");
+        get_commit_order_manager()->print_queue_status();
+      }
 
       // Killing Coordinator to indicate eventual consistency error
       mysql_mutex_lock(&c_rli->info_thd->LOCK_thd_data);
       c_rli->info_thd->awake(THD::KILL_QUERY);
       mysql_mutex_unlock(&c_rli->info_thd->LOCK_thd_data);
+    }
+    else
+    {
+      MY_D("Worker "<<this->id+1 <<" didn't report rollback. Please check this. This is because running_status: " << running_status);
     }
   }
 
@@ -2026,6 +2049,7 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
         So, we will make the worker to retry this transaction only if there is
         no error or the error is a temporary error.
       */
+      MY_D("Worker "<< this->id +1 << " found order_commit_deadlock");
       Diagnostics_area *da= thd->get_stmt_da();
       if (!thd->get_stmt_da()->is_error() ||
           has_temporary_error(thd,
@@ -2033,17 +2057,30 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
                               &silent))
       {
         error= ER_LOCK_DEADLOCK;
+        MY_D("Worker "<< this->id +1 << " setting ER_LOCK_DEADLOCK");
       }
 #ifndef DBUG_OFF
       else
       {
+        MY_D("Worker "<< this->id +1 << " In the else branch. thd->is_error():" << thd->is_error()?thd->get_stmt_da()->mysql_errno(): error);
         /*
-          The non-debug binary will not retry this transactions, stopping the
-          SQL thread because of the non-temporary error. But, as this situation
-          is not supposed to happen as described in the comment above, we will
-          fail an assert to ease the issue investigation when it happens.
+          If we reach here, then it means the worker encountered a
+          non-temporary error. In such a case, the non-debug binary will not
+          retry this transaction, and stops the SQL thread because of the
+          non-temporary error.
+
+          At this point, ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR is
+          also quite possible if the worker has hit
+          ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR in
+          Commit_order_manager::wait_for_its_turn().
+
+          Apart from the above two reasons, any other error is not supposed to
+          happen as described in the comment above. So, we will fail an assert
+          to ease the issue investigation when it happens.
         */
-        if (DBUG_EVALUATE_IF("rpl_fake_cod_deadlock", 0, 1))
+        if (DBUG_EVALUATE_IF("rpl_fake_cod_deadlock", 0, 1) &&
+                             da->mysql_errno() !=
+                             ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR)
           DBUG_ASSERT(false);
       }
 #endif
@@ -2051,12 +2088,19 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
 
     if (!has_temporary_error(thd, error, &silent) ||
         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::SESSION))
+    {
+      MY_D("temp_error:" << has_temporary_error(thd, 0, &silent));
+      MY_D("cannot_safely_rollback: "<< thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::SESSION));
+      MY_D("returning from retry_transaction");
       DBUG_RETURN(true);
+    }
+
 
     if (trans_retries >= slave_trans_retries)
     {
+      MY_D("Worker "<<this->id+1<<" exceeded retries : retries performed:" << trans_retries << " slave_trans_retries:"<< slave_trans_retries );
       thd->is_fatal_error= 1;
-      c_rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
+      c_rli->report(ERROR_LEVEL, thd->is_error() ? thd->get_stmt_da()->mysql_errno() : error,
                     "worker thread retried transaction %lu time(s) "
                     "in vain, giving up. Consider raising the value of "
                     "the slave_transaction_retries variable.", trans_retries);
@@ -2072,8 +2116,10 @@ bool Slave_worker::retry_transaction(uint start_relay_number,
 
     cleanup_context(thd, 1);
     reset_order_commit_deadlock();
+    MY_D("Worker " << this->id +1 << " entering sleep before retry");
     worker_sleep(min<ulong>(trans_retries, MAX_SLAVE_RETRY_PAUSE));
 
+    MY_D("Retrying txn for " << this->id+1 << " Remaining retries = "<< slave_trans_retries - trans_retries);
   } while (read_and_apply_events(start_relay_number, start_relay_pos,
                                  end_relay_number, end_relay_pos));
   DBUG_RETURN(false);
@@ -2728,6 +2774,7 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli)
 
     if (unlikely(thd->killed || worker->running_status == Slave_worker::STOP_ACCEPTED))
     {
+      MY_D("Worker "<<worker->id + 1 <<" was killed or STOP_ACCEPTED");
       DBUG_ASSERT(worker->running_status != Slave_worker::ERROR_LEAVING);
       // de-queueing and decrement counters is in the caller's exit branch
       error= -1;
@@ -2763,11 +2810,17 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli)
                                              &worker->ts_exec[0]);
     if (error || worker->found_order_commit_deadlock())
     {
+      MY_D("Worker "<< worker->id +1 <<" Before retry: error:"<<error<< " found_order_commit_deadlock:"<<worker->found_order_commit_deadlock());
       error= worker->retry_transaction(start_relay_number, start_relay_pos,
                                        job_item->relay_number,
                                        job_item->relay_pos);
       if (error)
+      {
+        MY_D("Worker "<< worker->id +1 <<" retry failed. Breaking the loop.");
         goto err;
+      }
+      else
+        MY_D("Worker "<< worker->id +1 <<" retry successful. Waiting for more event to process.");
     }
     /*
       p-event or any other event of B-free (malformed) group can
@@ -2794,10 +2847,12 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli)
       delete ev;
 
     job_item= pop_jobs_item(worker, job_item);
+    if (job_item) MY_D("Worker "<< worker->id +1 << " found a new event in its queue. Processing it.");
   }
 
   DBUG_PRINT("info", (" commits GAQ index %lu, last committed  %lu",
                       ev->mts_group_idx, worker->last_group_done_index));
+  MY_D("Worker "<< worker->id +1<<" came out the loop. execution successful. Calling slave_worker_ends_group with error 0");
   /* The group is applied successfully, so error should be 0 */
   worker->slave_worker_ends_group(ev, 0);
 
@@ -2820,8 +2875,10 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli)
 
   DBUG_RETURN(0);
 err:
+  MY_D("Worker "<< worker->id +1<<" error handling reached. error = "<< error);
   if (error)
   {
+    MY_D("Worker "<< worker->id +1<<" reporting error to co-orinator and calling slave_worker_ends_group with error");
     report_error_to_coordinator(worker);
     DBUG_PRINT("info", ("Worker %lu is exiting: killed %i, error %i, "
                         "running_status %d",

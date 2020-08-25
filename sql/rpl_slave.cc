@@ -6374,6 +6374,7 @@ extern "C" void *handle_slave_worker(void *arg)
   mysql_mutex_unlock(&w->jobs_lock);
 
 err:
+  MY_D("Worker "<<w->id + 1<<" Exiting.");
 
   if (thd)
   {

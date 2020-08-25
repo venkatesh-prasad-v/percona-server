@@ -24,8 +24,10 @@
 #define RPL_SLAVE_COMMIT_ORDER_MANAGER
 #ifdef HAVE_REPLICATION
 
+#include <sstream>
 #include "my_global.h"
 #include "sql_class.h"        // THD
+#include "my_debug.h"        // THD
 #include "rpl_rli_pdb.h"
 
 
@@ -78,11 +80,23 @@ public:
   */
   void report_commit(Slave_worker *worker)
   {
+    MY_D("Worker "<<worker->id +1<<" reporting commit, entering wait_for_its_turn";);
     wait_for_its_turn(worker, true);
     unregister_trx(worker);
   }
 
   void report_deadlock(Slave_worker *worker);
+  void print_queue_status()
+  {
+    std::ostringstream os;
+    os << std::endl << "Worker queue status :" << std::endl;
+    uint32 i = queue_head;
+    while (i != QUEUE_EOF) {
+      os << "i = "<< i+1<< " status = "<< m_workers[i].status <<" next = "<< m_workers[i].next + 1<<std::endl;
+      i=m_workers[i].next;
+    }
+    MY_D(os.str());
+  }
 private:
   enum order_commit_status
   {
@@ -118,6 +132,8 @@ private:
     queue_head= m_workers[queue_head].next;
     if (queue_head == QUEUE_EOF)
       queue_tail= QUEUE_EOF;
+    MY_D("Worker queue status after pop:");
+    print_queue_status();
   }
 
   void queue_push(uint32 index)
@@ -128,6 +144,8 @@ private:
       m_workers[queue_tail].next= index;
     queue_tail= index;
     m_workers[index].next= QUEUE_EOF;
+    MY_D("Worker queue status after push:");
+    print_queue_status();
   }
 
   uint32 queue_front() { return queue_head; }
@@ -215,6 +233,9 @@ inline void commit_order_manager_check_deadlock(THD* thd_self,
       wait_for_w->sequence_number() > self_w->sequence_number())
   {
     DBUG_PRINT("info", ("Found slave order commit deadlock"));
+    MY_D("========================================================");
+    MY_D("DEADLOCK: Worker "<<self_w->id+1 <<" is asking "<< wait_for_w->id+1 <<" to rollback. Sequence no self:"<<self_w->sequence_number()<<" wait:"<< wait_for_w->sequence_number());
+    MY_D("========================================================");
     mngr->report_deadlock(wait_for_w);
   }
   DBUG_VOID_RETURN;

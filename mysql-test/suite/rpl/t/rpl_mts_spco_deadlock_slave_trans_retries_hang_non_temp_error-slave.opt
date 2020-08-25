@@ -1,0 +1,1 @@
+--slave-parallel-workers=5 --slave-parallel-type=LOGICAL_CLOCK --no-console --log_error=$MYSQLTEST_VARDIR/tmp/rpl_mts_spco_deadlock_slave_trans_retries_hang_non_temp_error.2.err
