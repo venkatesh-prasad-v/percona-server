@@ -63,6 +63,7 @@ slave_ignored_err_throttle(window_size,
                            "Error log throttle: %lu time(s) Error_code: 1237"
                            " \"Slave SQL thread ignored the query because of"
                            " replicate-*-table rules\" got suppressed.");
+#include "rpl_thd_raii.h" /* Disable_index_extensions_switch_guard */
 #endif /* MYSQL_CLIENT */
 
 #include <base64.h>
@@ -11503,6 +11504,13 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       So we call set_time(), like in SBR. Presently it changes nothing.
     */
     thd->set_time(&(common_header->when));
+
+    /*
+      We don't consider index extensions in RBR, as doing so would cause
+      replication failure with UPDATE/DELETE when replica server has a PK on
+      extra columns and source does not.
+    */
+    Disable_index_extensions_switch_guard guard(thd);
 
     thd->binlog_row_event_extra_data = m_extra_row_data;
 
