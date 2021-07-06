@@ -11711,6 +11711,9 @@ ER_KEYRING_COMPONENT_CONFIG_PARSE_FAILED
 ER_PERCONA_UNSUPPORTED_ENGINE 
   eng "Table '%s.%s' requires the '%s' storage engine, which was removed in Percona Server 8.0.28"
 
+ER_RPL_ENABLE_EVENT_ADD_WILD_PATTERN_FAILED
+  eng "Could not add event rule '%s' to --replica-enable-event. %s"
+
 #
 # End of Percona Server 8.0 server error log messages
 #
