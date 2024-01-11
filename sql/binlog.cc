@@ -1652,6 +1652,9 @@ bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
 
   if (locked_sidno > 0) gtid_state->unlock_sidno(locked_sidno);
 
+  for (THD *head = first_seen; head && is_global_sid_locked; head = head->next_to_commit) {
+    if (head->owned_gtid.sidno > 0) gtid_state->assert_sidno_lock_not_owner(head->owned_gtid.sidno);
+  }
   if (is_global_sid_locked) global_sid_lock->unlock();
 
   return error;
@@ -8469,6 +8472,14 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
   bool skip_commit = is_loggable_xa_prepare(thd);
   bool is_atomic_ddl = false;
   auto xs = thd->get_transaction()->xid_state();
+  raii::Sentry<> print_gtid{[&]() -> void {
+      fprintf(stderr,"MYSQL_BIN_LOG::commit returned for thd %p, for gtid:%d:%ld\n",thd, thd->last_owned_gtid.sidno, thd->last_owned_gtid.gno);
+      if (all && xid) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(2);
+        global_sid_lock->unlock();
+      }
+  }};
   raii::Sentry<> reset_detached_guard{[&]() -> void {
     // XID_STATE may have been used to hold metadata for a detached transaction.
     // In that case, we need to reset it.
@@ -8486,12 +8497,26 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
                        (ulonglong)thd, YESNO(all), (ulonglong)xid,
                        (ulonglong)cache_mngr));
 
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    fprintf(stderr,"calling binlog commit for thd%p %d:%ld\n",thd, thd->owned_gtid.sidno, thd->owned_gtid.gno);
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   Scope_guard guard_applier_wait_enabled(
       [&thd]() { thd->disable_low_level_commit_ordering(); });
 
   if (is_current_stmt_binlog_enabled_and_caches_empty(thd)) {
     thd->enable_low_level_commit_ordering();
   }
+
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   /*
     No cache manager means nothing to log, but we still have to commit
     the transaction.
@@ -8502,6 +8527,11 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
     return RESULT_SUCCESS;
   }
 
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
   /*
     Reset binlog_snapshot_% variables for the current connection so that the
     current coordinates are shown after committing a consistent snapshot
@@ -8556,6 +8586,12 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
         m_dependency_tracker.get_max_committed_timestamp());
     if (cache_mngr->stmt_cache.finalize(thd)) return RESULT_ABORTED;
     stmt_stuff_logged = true;
+  }
+
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
   }
 
   /*
@@ -8648,6 +8684,11 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
     }
     trx_stuff_logged = true;
   }
+  if (thd->lex->sql_command != SQLCOM_END) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
 
   /*
     This is part of the stmt rollback.
@@ -8681,6 +8722,12 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       if (thd->get_stmt_da()->is_ok())
         thd->get_stmt_da()->reset_diagnostics_area();
       my_error(ER_RUN_HOOK_ERROR, MYF(0), "before_commit");
+
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
       return RESULT_ABORTED;
     }
     /*
@@ -8698,10 +8745,28 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       if (thd->get_stmt_da()->is_ok())
         thd->get_stmt_da()->reset_diagnostics_area();
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
+ if (thd->lex->sql_command != SQLCOM_END) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
       return RESULT_ABORTED;
     }
 
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
     int rc = ordered_commit(thd, all, skip_commit);
+
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
 
     if (rc) return RESULT_INCONSISTENT;
 
@@ -8736,6 +8801,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
     if (trx_coordinator::commit_in_engines(thd, all))
       return RESULT_INCONSISTENT;
   }
+
+  if (all && xid) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
 
   return RESULT_SUCCESS;
 }
@@ -8842,12 +8914,23 @@ THD *MYSQL_BIN_LOG::fetch_and_process_flush_stage_queue(
     ha_flush_logs(true);
   }
 
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   /*
     The transactions are flushed to the disk and so threads
     executing slave preserve commit order can be unblocked.
   */
   Commit_stage_manager::get_instance()
       .process_final_stage_for_ordered_commit_group(commit_order_thd);
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
   return first_seen;
 }
 
@@ -8864,7 +8947,17 @@ int MYSQL_BIN_LOG::process_flush_stage_queue(my_off_t *total_bytes_var,
   int flush_error = 1;
   mysql_mutex_assert_owner(&LOCK_log);
 
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
   THD *first_seen = fetch_and_process_flush_stage_queue();
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
   DBUG_EXECUTE_IF("crash_after_flush_engine_log", DBUG_SUICIDE(););
   CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_write_binlog");
   assign_automatic_gtids_to_flush_group(first_seen);
@@ -8930,7 +9023,7 @@ void MYSQL_BIN_LOG::process_commit_stage_queue(THD *thd, THD *first) {
       engines.
     */
 #ifndef NDEBUG
-    Commit_stage_manager::get_instance().clear_preempt_status(head);
+    /* Commit_stage_manager::get_instance().clear_preempt_status(head); */
 #endif
     if (head->get_transaction()->sequence_number != SEQ_UNINIT) {
       mysql_mutex_lock(&LOCK_replica_trans_dep_tracker);
@@ -9020,6 +9113,12 @@ bool MYSQL_BIN_LOG::change_stage(THD *thd [[maybe_unused]],
   assert(0 <= stage && stage < Commit_stage_manager::STAGE_COUNTER);
   assert(enter_mutex);
   assert(queue);
+  raii::Sentry<> assert_sid{[&]() -> void {
+      global_sid_lock->rdlock();
+      gtid_state->assert_sidno_lock_not_owner(2);
+      global_sid_lock->unlock();
+  }};
+
   /*
     enroll_for will release the leave_mutex once the sessions are
     queued.
@@ -9027,8 +9126,22 @@ bool MYSQL_BIN_LOG::change_stage(THD *thd [[maybe_unused]],
   if (!Commit_stage_manager::get_instance().enroll_for(
           stage, queue, leave_mutex, enter_mutex)) {
     assert(!thd_get_cache_mngr(thd)->dbug_any_finalized());
+    // follower
+    if (thd->owned_gtid.sidno > 0) {
+        fprintf(stderr,"follower thd %p returning from stage %d\n", thd, stage);
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+        global_sid_lock->unlock();
+    }
+
     return true;
   }
+  // Leader thread.
+    for (THD* td = queue; td; td=td->next_to_commit) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(td->last_owned_gtid.sidno);
+        global_sid_lock->unlock();
+    }
 
   return false;
 }
@@ -9158,6 +9271,13 @@ int MYSQL_BIN_LOG::finish_commit(THD *thd) {
     flush or sync errors are handled by the leader of the group
     (using binlog_error_action). Hence treat only COMMIT_ERRORs as errors.
   */
+
+  if (thd->slave_thread) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   return thd->commit_error == THD::CE_COMMIT_ERROR;
 }
 
@@ -9265,6 +9385,15 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit) {
   my_off_t total_bytes = 0;
   bool do_rotate = false;
 
+  raii::Sentry<> assert_sid{[&]() -> void {
+    if (all) {
+      global_sid_lock->rdlock();
+      gtid_state->assert_sidno_lock_not_owner(2);
+      global_sid_lock->unlock();
+    }
+  }};
+
+
   CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_assign_session_to_bgc_ticket");
   thd->rpl_thd_ctx.binlog_group_commit_ctx().assign_ticket();
 
@@ -9295,12 +9424,26 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit) {
     Commit_order_manager maintains it own queue and its own order for the
     commit. So Stage#0 doesn't maintain separate StageID.
   */
+
+  if (all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   if (Commit_order_manager::wait_for_its_turn_before_flush_stage(thd) ||
       ending_trans(thd, all) ||
       Commit_order_manager::get_rollback_status(thd)) {
     if (Commit_order_manager::wait(thd)) {
       return thd->commit_error;
     }
+  }
+
+
+  if (all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
   }
 
   /*
@@ -9335,8 +9478,21 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit) {
     goto commit_stage;
   }
   DEBUG_SYNC(thd, "waiting_in_the_middle_of_flush_stage");
+
+  if (all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   flush_error =
       process_flush_stage_queue(&total_bytes, &do_rotate, &wait_queue);
+
+  if (all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
 
   if (flush_error == 0 && total_bytes > 0)
     flush_error = flush_cache_to_file(&flush_end_pos);
@@ -9376,13 +9532,18 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit) {
   }
 
   publish_coordinates_for_global_status();
-
   DEBUG_SYNC(thd, "bgc_after_flush_stage_before_sync_stage");
 
   /*
     Stage #2: Syncing binary log file to disk
   */
 
+
+  if (all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
   if (change_stage(thd, Commit_stage_manager::SYNC_STAGE, wait_queue, &LOCK_log,
                    &LOCK_sync)) {
     DBUG_PRINT("return", ("Thread ID: %u, commit_error: %d", thd->thread_id(),

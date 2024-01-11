@@ -465,6 +465,8 @@ class Rpl_thd_context {
     rpl_channel_type = rpl_channel_type_arg;
   }
 
+  void assert_not_sid_owner(THD *thd, bool needs_lock=true);
+
   inline Transaction_compression_ctx &transaction_compression_ctx() {
     return m_transaction_compression_ctx;
   }

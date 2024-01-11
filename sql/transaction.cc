@@ -243,6 +243,11 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
+  if (thd->owned_gtid.sidno>0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
   res = ha_commit_trans(thd, true, ignore_global_read_lock);
   if (res == false)
     if (thd->rpl_thd_ctx.session_gtids_ctx().notify_after_transaction_commit(
@@ -519,6 +524,14 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
     savepoint when statement has succeeded.
   */
   assert(!thd->in_sub_stmt);
+
+  if (thd->get_transaction()->xid_state()->get_xid()->get_my_xid() &&
+          (thd->lex->sql_command == SQLCOM_CREATE_TABLE ||
+           thd->lex->sql_command == SQLCOM_DROP_TABLE)) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
 
   /*
     Some code in MYSQL_BIN_LOG::commit and ha_commit_low() is not safe

@@ -96,6 +96,7 @@ enum_return_status Gtid_state::acquire_ownership(THD *thd, const Gtid &gtid) {
 #endif
   } else {
     thd->owned_gtid = gtid;
+    thd->last_owned_gtid = gtid;
     thd->owned_gtid.dbug_print(nullptr, "set owned_gtid in acquire_ownership");
     thd->owned_sid = sid_map->sidno_to_sid(gtid.sidno);
     thd->rpl_thd_ctx.last_used_gtid_tracker_ctx().set_last_used_gtid(gtid);
@@ -122,6 +123,7 @@ err:
 
 #ifdef HAVE_GTID_NEXT_LIST
 void Gtid_state::lock_owned_sidnos(const THD *thd) {
+    assert(0);
   if (thd->owned_gtid.sidno == THD::OWNED_SIDNO_GTID_SET)
     lock_sidnos(&thd->owned_gtid_set);
   else if (thd->owned_gtid.sidno > 0)
@@ -174,6 +176,9 @@ void Gtid_state::update_commit_group(THD *first_thd) {
   */
   DEBUG_SYNC(first_thd, "update_gtid_state_before_global_sid_lock");
   global_sid_lock->rdlock();
+  fprintf(stderr,"          THD %p took rdlock(), current_thd=%p\n", first_thd, current_thd);
+  assert_sidno_lock_not_owner(1);
+  assert_sidno_lock_not_owner(2);
   DEBUG_SYNC(first_thd, "update_gtid_state_after_global_sid_lock");
 
   update_gtids_impl_lock_sidnos(first_thd);
@@ -205,7 +210,10 @@ void Gtid_state::update_commit_group(THD *first_thd) {
 
   update_gtids_impl_broadcast_and_unlock_sidnos();
 
+  assert_sidno_lock_not_owner(1);
+  assert_sidno_lock_not_owner(2);
   global_sid_lock->unlock();
+  fprintf(stderr,"          THD %p released rdlock(), current_thd=%p\n", first_thd, current_thd);
 
   if (gtid_threshold_breach)
     LogErr(WARNING_LEVEL, ER_WARN_GTID_THRESHOLD_BREACH);
@@ -278,6 +286,7 @@ bool Gtid_state::wait_for_sidno(THD *thd, rpl_sidno sidno,
                                 struct timespec *abstime,
                                 bool update_thd_status) {
   DBUG_TRACE;
+  assert(0);
   PSI_stage_info old_stage;
   PSI_stage_info stage = stage_waiting_for_gtid_to_be_committed;
   sid_lock->assert_some_lock();
@@ -306,6 +315,7 @@ bool Gtid_state::wait_for_gtid(THD *thd, const Gtid &gtid,
   assert(!owned_gtids.is_owned_by(gtid, 0));
 
   bool ret = wait_for_sidno(thd, gtid.sidno, abstime);
+  sid_locks.assert_not_owner(gtid.sidno);
   return ret;
 }
 
@@ -505,6 +515,7 @@ enum_return_status Gtid_state::generate_automatic_gtid(
     Gtid automatic_gtid = {specified_sidno, specified_gno};
 
     if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
+    else assert(0);
 
     /*
       We need to lock the sidno if locked_sidno wasn't passed as paramenter
@@ -689,6 +700,12 @@ int Gtid_state::save(THD *thd) {
   assert(thd->owned_gtid.sidno > 0);
   int error = 0;
 
+    if (thd->owned_gtid.sidno > 0) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+        global_sid_lock->unlock();
+    }
+
   int ret = gtid_table_persistor->save(thd, &thd->owned_gtid);
   if (1 == ret) {
     /*
@@ -839,16 +856,22 @@ void Gtid_state ::update_gtids_impl_own_gtid_set(THD *thd [[maybe_unused]],
 void Gtid_state::update_gtids_impl_lock_sidno(rpl_sidno sidno) {
   assert(sidno > 0);
   DBUG_PRINT("info", ("Locking sidno %d", sidno));
+  fprintf(stderr,"      THD %p locking sidno %d\n",current_thd, sidno);
   lock_sidno(sidno);
+  fprintf(stderr,"      THD %p locked sidno %d\n",current_thd, sidno);
 }
 
 void Gtid_state::update_gtids_impl_lock_sidnos(THD *first_thd) {
   /* Define which sidnos should be locked to be updated */
+  std::stringstream ss;
+
+  ss << "commit_group_sidnos: queue front:" << first_thd << " current_thd:" << current_thd << "\n";
   for (THD *thd = first_thd; thd != nullptr; thd = thd->next_to_commit) {
     if (thd->owned_gtid.sidno > 0) {
       DBUG_PRINT("info",
                  ("Setting sidno %d to be locked", thd->owned_gtid.sidno));
       commit_group_sidnos[thd->owned_gtid.sidno] = true;
+      ss << thd << ":" << thd->owned_gtid.sidno << " ";
     } else if (thd->owned_gtid.sidno == THD::OWNED_SIDNO_GTID_SET)
 #ifdef HAVE_GTID_NEXT_LIST
       for (rpl_sidno i = 1; i < thd->owned_gtid_set.max_sidno; i++)
@@ -857,10 +880,14 @@ void Gtid_state::update_gtids_impl_lock_sidnos(THD *first_thd) {
       assert(0);
 #endif
   }
+  ss << "END";
+  fprintf(stderr, "          %s\n",ss.str().c_str());
 
   /* Take the sidno_locks in order */
   for (rpl_sidno i = 1; i < (rpl_sidno)commit_group_sidnos.size(); i++)
-    if (commit_group_sidnos[i]) update_gtids_impl_lock_sidno(i);
+    if (commit_group_sidnos[i]) {
+      update_gtids_impl_lock_sidno(i);
+    }
 }
 
 void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
@@ -919,16 +946,23 @@ void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
 
 void Gtid_state::update_gtids_impl_broadcast_and_unlock_sidno(rpl_sidno sidno) {
   DBUG_PRINT("info", ("Unlocking sidno %d", sidno));
+  if (current_thd->slave_thread) gtid_state->assert_sidno_lock_owner(2);
   broadcast_sidno(sidno);
+  fprintf(stderr,"      THD %p unlocking sidno %d\n",current_thd, sidno);
   unlock_sidno(sidno);
+  fprintf(stderr,"      THD %p unlocked sidno %d\n",current_thd, sidno);
+  if (current_thd->slave_thread) gtid_state->assert_sidno_lock_not_owner(2);
 }
 
 void Gtid_state::update_gtids_impl_broadcast_and_unlock_sidnos() {
   for (rpl_sidno i = 1; i < (rpl_sidno)commit_group_sidnos.size(); i++)
     if (commit_group_sidnos[i]) {
+      fprintf(stderr,"      unlocking sidno %d\n",i);
       update_gtids_impl_broadcast_and_unlock_sidno(i);
       commit_group_sidnos[i] = false;
     }
+  for (rpl_sidno i = 1; i < (rpl_sidno)commit_group_sidnos.size(); i++)
+    assert(commit_group_sidnos[i] == false);
 }
 
 void Gtid_state::update_gtids_impl_own_anonymous(THD *thd, bool *more_trx) {

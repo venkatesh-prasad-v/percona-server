@@ -479,6 +479,11 @@ void Commit_stage_manager::process_final_stage_for_ordered_commit_group(
     gtid_state->update_commit_group(first);
     signal_done(first, Commit_stage_manager::COMMIT_ORDER_FLUSH_STAGE);
   }
+  for (THD *thd = first; thd; thd=thd->next_to_commit) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
 }
 
 void Commit_stage_manager::signal_done(THD *queue, StageID stage) {

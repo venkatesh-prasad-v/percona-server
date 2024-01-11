@@ -986,11 +986,26 @@ class Mutex_cond_array {
     mysql_mutex_assert_owner(&mutex_cond->mutex);
     return is_timeout(error);
   }
+
+  /// A mutex/cond pair.
+  struct Mutex_cond {
+    mysql_mutex_t mutex;
+    mysql_cond_t cond;
+  };
+  /// Return the Nth Mutex_cond object
+  inline Mutex_cond *get_mutex_cond(int n) const {
+    global_lock->assert_some_lock();
+    assert(n <= get_max_index());
+    Mutex_cond *ret = m_array[n];
+    assert(ret);
+    return ret;
+  }
 #ifdef MYSQL_SERVER
   /// Execute THD::enter_cond for the n'th condition variable.
   void enter_cond(THD *thd, int n, PSI_stage_info *stage,
                   PSI_stage_info *old_stage) const;
 #endif  // ifdef MYSQL_SERVER
+  void assert_mutex(Mutex_cond* cond, THD *thd);
   /// Return the greatest addressable index in this Mutex_cond_array.
   inline int get_max_index() const {
     global_lock->assert_some_lock();
@@ -1017,19 +1032,6 @@ class Mutex_cond_array {
             false - thread not killed
   */
   bool is_thd_killed(const THD *thd) const;
-  /// A mutex/cond pair.
-  struct Mutex_cond {
-    mysql_mutex_t mutex;
-    mysql_cond_t cond;
-  };
-  /// Return the Nth Mutex_cond object
-  inline Mutex_cond *get_mutex_cond(int n) const {
-    global_lock->assert_some_lock();
-    assert(n <= get_max_index());
-    Mutex_cond *ret = m_array[n];
-    assert(ret);
-    return ret;
-  }
   /// Read-write lock that protects updates to the number of elements.
   mutable Checkable_rwlock *global_lock;
   Prealloced_array<Mutex_cond *, 8> m_array;
@@ -3074,16 +3076,6 @@ class Gtid_state {
                                              rpl_gno specified_gno = 0,
                                              rpl_sidno *locked_sidno = nullptr);
 
-  /// Locks a mutex for the given SIDNO.
-  void lock_sidno(rpl_sidno sidno) { sid_locks.lock(sidno); }
-  /// Unlocks a mutex for the given SIDNO.
-  void unlock_sidno(rpl_sidno sidno) { sid_locks.unlock(sidno); }
-  /// Broadcasts updates for the given SIDNO.
-  void broadcast_sidno(rpl_sidno sidno) { sid_locks.broadcast(sidno); }
-  /// Assert that we own the given SIDNO.
-  void assert_sidno_lock_owner(rpl_sidno sidno) const {
-    sid_locks.assert_owner(sidno);
-  }
 #ifdef MYSQL_SERVER
   /**
     Wait for a signal on the given SIDNO.
@@ -3376,8 +3368,24 @@ class Gtid_state {
   mutable Checkable_rwlock *sid_lock;
   /// The Sid_map used by this Gtid_state.
   mutable Sid_map *sid_map;
+ public:
+
   /// Contains one mutex/cond pair for every SIDNO.
   Mutex_cond_array sid_locks;
+  /// Locks a mutex for the given SIDNO.
+  void lock_sidno(rpl_sidno sidno) { sid_locks.lock(sidno); }
+  /// Unlocks a mutex for the given SIDNO.
+  void unlock_sidno(rpl_sidno sidno) { sid_locks.unlock(sidno); }
+  /// Broadcasts updates for the given SIDNO.
+  void broadcast_sidno(rpl_sidno sidno) { sid_locks.broadcast(sidno); }
+  /// Assert that we own the given SIDNO.
+  void assert_sidno_lock_owner(rpl_sidno sidno) const {
+    sid_locks.assert_owner(sidno);
+  }
+  void assert_sidno_lock_not_owner(rpl_sidno sidno) const {
+    sid_locks.assert_not_owner(sidno);
+  }
+ private:
   /**
     The set of GTIDs that existed in some previously purged binary log.
     This is always a subset of executed_gtids.

@@ -211,11 +211,21 @@ void Commit_order_manager::flush_engine_and_signal_threads(
     leader and will flush to engine and update gtid state, on behalf of all the
     followers.
   */
+   global_sid_lock->rdlock();
+   gtid_state->assert_sidno_lock_not_owner(2);
+   global_sid_lock->unlock();
+
   if (!Commit_stage_manager::get_instance().enroll_for(
           Commit_stage_manager::COMMIT_ORDER_FLUSH_STAGE, worker->info_thd,
           nullptr, mysql_bin_log.get_log_lock())) {
     m_workers[worker->id].m_stage =
         cs::apply::Commit_order_queue::enum_worker_stage::FINISHED;
+    // follower
+    if (worker->info_thd->last_owned_gtid.sidno > 0) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(worker->info_thd->owned_gtid.sidno);
+        global_sid_lock->unlock();
+    }
     return;
   }
 
@@ -238,8 +248,25 @@ void Commit_order_manager::flush_engine_and_signal_threads(
 
   reset_server_status(first);
 
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   /* add to @@global.gtid_executed */
+  // leader
+    if (worker->info_thd->last_owned_gtid.sidno > 0) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(worker->info_thd->last_owned_gtid.sidno);
+        global_sid_lock->unlock();
+    }
   gtid_state->update_commit_group(first);
+  {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
 
   mysql_mutex_unlock(mysql_bin_log.get_commit_lock());
 
@@ -317,6 +344,9 @@ void Commit_order_manager::finish(Slave_worker *worker) {
         has committed and signalled all waiting commit order threads.
       */
       flush_engine_and_signal_threads(worker);
+      global_sid_lock->rdlock();
+      gtid_state->assert_sidno_lock_not_owner(2);
+      global_sid_lock->unlock();
 
     } else {
       /*
@@ -405,6 +435,9 @@ void Commit_order_manager::wait_and_finish(THD *thd, bool error) {
       // No error or deadlock: release next worker.
       mngr->wait(worker);
       mngr->finish(worker);
+      global_sid_lock->rdlock();
+      gtid_state->assert_sidno_lock_not_owner(2);
+      global_sid_lock->unlock();
     }
   }
 }

@@ -137,6 +137,7 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec) {
         }
         // GTID owned by someone (other thread)
         else {
+          assert(0);
           // The call below releases the read lock on global_sid_lock and
           // the mutex lock on SIDNO.
           gtid_state->wait_for_gtid(thd, spec.gtid);
@@ -167,6 +168,7 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec) {
       break;
 
     case PRE_GENERATE_GTID: {
+      assert(0);
       Gtid_specification new_spec = spec;
       gtid_state->lock_sidno(new_spec.gtid.sidno);
       lock_count = 2;
@@ -187,9 +189,14 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec) {
   ret = false;
 
 err:
-  if (lock_count == 2) gtid_state->unlock_sidno(spec.gtid.sidno);
+  if (lock_count == 2) {
+    gtid_state->unlock_sidno(spec.gtid.sidno);
+  }
 
-  if (lock_count >= 1) global_sid_lock->unlock();
+  if (lock_count >= 1) {
+      if (thd->owned_gtid.sidno > 0) gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+      global_sid_lock->unlock();
+  }
 
   if (!ret) gtid_set_performance_schema_values(thd);
   thd->owned_gtid.dbug_print(nullptr, "Set owned_gtid in set_gtid_next");
@@ -203,6 +210,7 @@ err:
 */
 #ifdef HAVE_GTID_NEXT_LIST
 int gtid_acquire_ownership_multiple(THD *thd) {
+  assert(0);
   const Gtid_set *gtid_next_list = thd->get_gtid_next_list_const();
   rpl_sidno greatest_sidno = 0;
   DBUG_TRACE;

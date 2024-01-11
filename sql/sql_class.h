@@ -4036,6 +4036,7 @@ class THD : public MDL_context_owner,
     use Gtid_specification instead of Gtid.
   */
   Gtid owned_gtid;
+  Gtid last_owned_gtid;
   static const int OWNED_SIDNO_GTID_SET = -1;
   static const int OWNED_SIDNO_ANONYMOUS = -2;
 

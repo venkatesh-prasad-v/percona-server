@@ -6147,7 +6147,16 @@ void Xid_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
 bool Xid_log_event::do_commit(THD *thd_arg) {
   DBUG_EXECUTE_IF("dbug.reached_commit",
                   { DBUG_SET("+d,dbug.enabled_commit"); });
+  if (thd->owned_gtid.sidno > 0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
   bool error = trans_commit(thd_arg); /* Automatically rolls back on error. */
+  global_sid_lock->rdlock();
+  gtid_state->assert_sidno_lock_not_owner(2);
+  global_sid_lock->unlock();
+
   DBUG_EXECUTE_IF("crash_after_apply",
                   sql_print_information("Crashing crash_after_apply.");
                   DBUG_SUICIDE(););
@@ -13400,6 +13409,7 @@ int Gtid_log_event::do_apply_event(Relay_log_info const *rli) {
              (rli->m_assign_gtids_to_anonymous_transactions_info.get_type() >
               Assign_gtids_to_anonymous_transactions_info::enum_type::
                   AGAT_OFF)) {
+    assert(0);
     assert(global_gtid_mode.get() == Gtid_mode::ON);
     spec.type = PRE_GENERATE_GTID;
     spec.gtid.sidno =
@@ -13411,6 +13421,7 @@ int Gtid_log_event::do_apply_event(Relay_log_info const *rli) {
     // This can happen e.g. if gtid_mode is incompatible with spec.
     return 1;
 
+  thd->rpl_thd_ctx.assert_not_sid_owner(thd);
   /*
     Set the original_commit_timestamp.
     0 will be used if this event does not contain such information.

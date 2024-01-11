@@ -284,6 +284,13 @@ void Rpl_thd_context::set_tx_rpl_delegate_stage_status(
     enum_transaction_rpl_delegate_status status) {
   m_tx_rpl_delegate_stage_status = status;
 }
+  
+
+void Rpl_thd_context::assert_not_sid_owner(THD *thd, bool needs_lock) {
+    if (needs_lock) global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    if (needs_lock) global_sid_lock->unlock();
+}
 
 Rpl_thd_context::enum_transaction_rpl_delegate_status
 Rpl_thd_context::get_tx_rpl_delegate_stage_status() {

@@ -1737,6 +1737,11 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
     my_error(ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0));
     return 2;
   }
+  if (thd->owned_gtid.sidno>0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
 
   MDL_request mdl_request;
   bool release_mdl = false;
@@ -1791,6 +1796,12 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
       goto end;
     }
 
+    if (thd->slave_thread) {
+      global_sid_lock->rdlock();
+      gtid_state->assert_sidno_lock_not_owner(2);
+      global_sid_lock->unlock();
+    }
+
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
       error = tc_log->prepare(thd, all);
   }
@@ -1807,11 +1818,26 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
 
     xid_state->set_state(XID_STATE::XA_PREPARED);
   }
+
+  if (thd->slave_thread && all) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    fprintf(stderr,"calling binlog commit for slave thd%p %d:%ld\n",thd, thd->owned_gtid.sidno, thd->owned_gtid.gno);
+    global_sid_lock->unlock();
+  }
+
   if (error || (error = tc_log->commit(thd, all))) {
     ha_rollback_trans(thd, all);
     error = 1;
     goto end;
   }
+
+  if (thd->slave_thread) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
 /*
         Mark multi-statement (any autocommit mode) or single-statement
         (autocommit=1) transaction as rolled back
@@ -1842,6 +1868,12 @@ end:
     thd->tx_priority = 0;
   }
 
+  if (thd->slave_thread) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(2);
+    global_sid_lock->unlock();
+  }
+
   if (need_clear_owned_gtid) {
     thd->server_status &= ~SERVER_STATUS_IN_TRANS;
     /*
@@ -1857,6 +1889,11 @@ end:
     if (has_commit_order_manager(thd) && error) {
       gtid_state->update_on_rollback(thd);
     }
+  }
+  if (thd->owned_gtid.sidno>0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
   }
   if (run_slave_post_commit) {
     DBUG_EXECUTE_IF("replica_crash_after_commit", DBUG_SUICIDE(););
@@ -1978,6 +2015,11 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit) {
         // compared against expected result first.
       } else {
         Commit_order_manager::wait_and_finish(thd, error);
+        if (all && has_commit_order_manager(thd)) {
+          global_sid_lock->rdlock();
+          gtid_state->assert_sidno_lock_not_owner(2);
+          global_sid_lock->unlock();
+        }
       }
     }
   }
@@ -2110,6 +2152,11 @@ int ha_rollback_trans(THD *thd, bool all) {
     my_error(ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0));
     return 1;
   }
+  if (thd->owned_gtid.sidno>0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
 
   if (tc_log) error = tc_log->rollback(thd, all);
     /*
@@ -2155,6 +2202,11 @@ int ha_rollback_trans(THD *thd, bool all) {
       !thd->slave_thread && thd->killed != THD::KILL_CONNECTION)
     trn_ctx->push_unsafe_rollback_warnings(thd);
 
+  if (thd->owned_gtid.sidno>0) {
+    global_sid_lock->rdlock();
+    gtid_state->assert_sidno_lock_not_owner(thd->owned_gtid.sidno);
+    global_sid_lock->unlock();
+  }
   return error;
 }
 

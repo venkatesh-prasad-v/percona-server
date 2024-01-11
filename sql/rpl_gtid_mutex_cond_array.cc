@@ -62,10 +62,14 @@ Mutex_cond_array::~Mutex_cond_array() {
   global_lock->unlock();
 }
 
+void Mutex_cond_array::assert_mutex(Mutex_cond* cond, THD *thd) {
+    assert(&cond->mutex == thd->current_mutex);
+}
 void Mutex_cond_array::enter_cond(THD *thd, int n, PSI_stage_info *stage,
                                   PSI_stage_info *old_stage) const {
   DBUG_TRACE;
   Mutex_cond *mutex_cond = get_mutex_cond(n);
+  fprintf(stderr, "[debug] Entering cond for sidno %d\n, mutex=%p\n",n, &mutex_cond->mutex);
   thd->ENTER_COND(&mutex_cond->cond, &mutex_cond->mutex, stage, old_stage);
 }
 

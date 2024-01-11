@@ -3854,6 +3854,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
       assert(first_table == all_tables && first_table != nullptr);
       assert(lex->m_sql_cmd != nullptr);
       res = lex->m_sql_cmd->execute(thd);
+      if (thd->get_transaction()->xid_state()->get_xid()->get_my_xid() && thd->lex->sql_command == SQLCOM_CREATE_TABLE) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(2);
+        global_sid_lock->unlock();
+      }
       break;
     }
     case SQLCOM_DROP_TABLE: {
@@ -3889,6 +3894,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
       /* DDL and binlog write order are protected by metadata locks. */
       res = mysql_rm_table(thd, first_table, lex->drop_if_exists,
                            lex->drop_temporary);
+      if (thd->get_transaction()->xid_state()->get_xid()->get_my_xid()) {
+        global_sid_lock->rdlock();
+        gtid_state->assert_sidno_lock_not_owner(2);
+        global_sid_lock->unlock();
+      }
       /* when dropping temporary tables if @@session_track_state_change is ON
          then send the boolean tracker in the OK packet */
       if (!res && lex->drop_temporary) {
