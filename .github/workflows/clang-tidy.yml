@@ -5,6 +5,7 @@ run-name: GitHub actions for clang-tidy checks
 on:
   pull_request:
     branches:
+      - 5.7
       - 8.0
       - trunk
       - release-*
@@ -35,7 +36,7 @@ jobs:
           curl -sSL "http://apt.llvm.org/llvm-snapshot.gpg.key" | sudo -E apt-key add -
           echo "deb http://apt.llvm.org/${UBUNTU_CODE_NAME}/ llvm-toolchain-${UBUNTU_CODE_NAME}-${COMPILER_VERSION} main" | sudo tee -a /etc/apt/sources.list > /dev/null
           sudo apt-get update
-          sudo apt-get install -y --allow-unauthenticated --no-install-recommends --no-install-recommends clang-${COMPILER_VERSION} clang-tidy-${COMPILER_VERSION} libldap2-dev curl libcurl4-openssl-dev bison libudev-dev libkrb5-dev libreadline-dev zlib1g-dev liblz4-dev \
+          sudo apt-get install -y --allow-unauthenticated --no-install-recommends clang-${COMPILER_VERSION} clang-tidy-${COMPILER_VERSION} libldap2-dev curl libcurl4-openssl-dev bison libudev-dev libkrb5-dev libreadline-dev zlib1g-dev liblz4-dev \
           libedit-dev libevent-dev protobuf-compiler libprotobuf-dev libprotoc-dev libfido2-dev libldap2-dev libsasl2-dev libsasl2-modules
 
       - name: Cache boost
@@ -48,7 +49,7 @@ jobs:
       - name: Download boost
         if: steps.cache-boost.outputs.cache-hit != 'true'
         run: |
-          wget --progress=dot:giga -P ${BOOST_DIR} "http://downloads.sourceforge.net/boost/boost/${BOOST_VERSION//_/.}/boost_${BOOST_VERSION}.tar.gz"
+          wget --progress=dot:giga -P ${BOOST_DIR} "https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION//_/.}/source/boost_${BOOST_VERSION}.tar.gz"
           tar -xzf "${BOOST_DIR}/boost_${BOOST_VERSION}.tar.gz" -C "${BOOST_DIR}"
 
       - name: Prepare compile_commands.json
